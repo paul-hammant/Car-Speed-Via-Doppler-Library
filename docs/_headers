@@ -1,0 +1,19 @@
+# Custom headers for GitHub Pages
+/*
+  Cross-Origin-Embedder-Policy: credentialless
+  Cross-Origin-Opener-Policy: same-origin-allow-popups
+  Access-Control-Allow-Origin: *
+  Access-Control-Allow-Methods: GET, POST, OPTIONS
+  Access-Control-Allow-Headers: *
+
+# WASM files
+/*.wasm
+  Content-Type: application/wasm
+
+# Audio files  
+/*.wav
+  Content-Type: audio/wav
+
+# JavaScript modules
+/*.js
+  Content-Type: application/javascript

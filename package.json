@@ -1,0 +1,51 @@
+{
+  "name": "car-speed-via-doppler-library",
+  "version": "2.0.0",
+  "description": "Car Speed Via Doppler Library",
+  "type": "module",
+  "types": "types/index.d.ts",
+  "scripts": {
+    "test:unit": "node test/unit/run-all-unit-tests.js",
+    "test:reporter": "node test/unit/test-test-reporter.js",
+    "test:playwright": "npx playwright test",
+    "test": "npx playwright test"
+  },
+  "dependencies": {
+    "wavefile": "^11.0.0"
+  },
+  "keywords": [
+    "doppler-effect",
+    "speed-detection",
+    "vehicle-speed",
+    "audio-analysis",
+    "fft",
+    "signal-processing",
+    "frequency-analysis",
+    "spectrum-analysis",
+    "typescript",
+    "type-definitions"
+  ],
+  "author": "Paul with AI help",
+  "license": "GPL-3.0",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "local"
+  },
+  "files": [
+    "docs/",
+    "types/",
+    "README.md"
+  ],
+  "directories": {
+    "test": "test",
+    "doc": "docs"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.53.0",
+    "express": "^5.1.0",
+    "http-server": "^14.1.1"
+  }
+}

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deployment Test</title>
+</head>
+<body>
+    <h1>Static Deployment Test</h1>
+    <div id="results"></div>
+    
+    <script type="module">
+        async function testDeployment() {
+            const resultsDiv = document.getElementById('results');
+            let output = 'Testing static deployment...\n\n';
+            
+            try {
+                // Test Pure JS implementation
+                output += '1. Testing Pure JS FFT...\n';
+                const { fft } = await import('./pure-js/fft-wrapper.js');
+                const testSignal = [1, 0, 1, 0, 1, 0, 1, 0]; // Simple test signal
+                const result = fft(testSignal);
+                output += `   ✅ Pure JS FFT working (result length: ${result.length})\n\n`;
+                
+                // Test shared utilities
+                output += '2. Testing shared utilities...\n';
+                const AudioProcessor = (await import('./shared/audio-utils.js')).default;
+                const WindowingUtils = (await import('./shared/windowing-utils.js')).default;
+                const DopplerCalculator = (await import('./shared/doppler-calculator.js')).default;
+                
+                output += '   ✅ AudioProcessor loaded\n';
+                output += '   ✅ WindowingUtils loaded\n';
+                output += '   ✅ DopplerCalculator loaded\n\n';
+                
+                // Test windowing
+                const testSamples = [1, 2, 3, 4, 5, 6, 7, 8];
+                const windowed = WindowingUtils.applyWindow(testSamples, 'hamming');
+                output += `   ✅ Windowing works (windowed length: ${windowed.length})\n\n`;
+                
+                // Test Doppler calculation
+                const calculator = new DopplerCalculator();
+                const speed = calculator.calculateSpeed(1000, 950); // Example frequencies
+                output += `   ✅ Doppler calculation works (speed: ${speed.toFixed(1)} km/h)\n\n`;
+                
+                output += '3. Testing WASM modules...\n';
+                try {
+                    const simdFft = await import('./simd/fft-wrapper.js');
+                    output += '   ✅ SIMD FFT module loaded\n';
+                } catch (error) {
+                    output += `   ⚠️  SIMD FFT module failed: ${error.message}\n`;
+                }
+                
+                try {
+                    const noSimdFft = await import('./non-simd/fft-wrapper.js');
+                    output += '   ✅ Non-SIMD FFT module loaded\n';
+                } catch (error) {
+                    output += `   ⚠️  Non-SIMD FFT module failed: ${error.message}\n`;
+                }
+                
+                output += '\n4. Testing audio file access...\n';
+                try {
+                    const response = await fetch('./shared/23_mph.wav');
+                    if (response.ok) {
+                        output += `   ✅ Audio files accessible (23_mph.wav: ${response.headers.get('content-length')} bytes)\n`;
+                    } else {
+                        output += `   ❌ Audio files not accessible: ${response.status}\n`;
+                    }
+                } catch (error) {
+                    output += `   ❌ Audio file access failed: ${error.message}\n`;
+                }
+                
+                output += '\n🎉 Deployment test completed!\n';
+                output += '\nTo use:\n';
+                output += '1. Serve this directory with an HTTP server\n';
+                output += '2. Open index.html in a browser\n';
+                output += '3. Click "Run FFT Performance Comparison"\n';
+                
+            } catch (error) {
+                output += `\n❌ Test failed: ${error.message}\n`;
+                console.error('Test error:', error);
+            }
+            
+            resultsDiv.textContent = output;
+        }
+        
+        testDeployment();
+    </script>
+</body>
+</html>

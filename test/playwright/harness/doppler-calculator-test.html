@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DopplerCalculator Browser Test Harness</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        #results { background: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .pass { color: green; }
+        .fail { color: red; }
+    </style>
+</head>
+<body>
+    <h1>🎯 DopplerCalculator Browser Test Harness</h1>
+    <div id="results">Loading test harness...</div>
+
+    <script type="module">
+        import DopplerCalculator from '../../../docs/shared/doppler-calculator.js';
+
+        // Test data sets matching Node.js tests
+        const testCases = {
+            basic: [
+                { approachFreq: 1088, recedeFreq: 925, expectedSpeed: 100, tolerance: 5 },
+                { approachFreq: 1050, recedeFreq: 950, expectedSpeed: 30, tolerance: 5 },
+                { approachFreq: 1120, recedeFreq: 920, expectedSpeed: 60, tolerance: 5 },
+                { approachFreq: 1010, recedeFreq: 990, expectedSpeed: 10, tolerance: 2 },
+                { approachFreq: 1000, recedeFreq: 1000, expectedSpeed: 0, tolerance: 1 }
+            ],
+            edgeCases: [
+                { approachFreq: 2000, recedeFreq: 500, expectedSpeed: 200, tolerance: 10 },
+                { approachFreq: 1001, recedeFreq: 999, expectedSpeed: 1, tolerance: 1 },
+                { approachFreq: 1200, recedeFreq: 800, expectedSpeed: 120, tolerance: 10 }
+            ],
+            validation: [
+                { approachFreq: 950, recedeFreq: 1050, expectedError: 'Approach frequency must be higher than recede frequency' },
+                { approachFreq: 1000, recedeFreq: 1000, expectedSpeed: 0, tolerance: 1 },
+                { approachFreq: -100, recedeFreq: 900, expectedError: 'Frequencies must be positive' },
+                { approachFreq: 1100, recedeFreq: -900, expectedError: 'Frequencies must be positive' }
+            ]
+        };
+
+        // Main test function for single calculation
+        window.testDopplerCalculation = async function(approachFreq, recedeFreq, expectedSpeed, tolerance = 5) {
+            try {
+                const calculator = new DopplerCalculator();
+                const startTime = performance.now();
+                const result = calculator.calculateSpeed(approachFreq, recedeFreq);
+                const processingTime = performance.now() - startTime;
+                
+                const error = Math.abs(result - expectedSpeed);
+                const success = error <= tolerance;
+                
+                return {
+                    approachFreq,
+                    recedeFreq,
+                    expectedSpeed,
+                    calculatedSpeed: result,
+                    error: error.toFixed(2),
+                    tolerance,
+                    success,
+                    processingTime: processingTime.toFixed(3),
+                    errorMessage: null
+                };
+                
+            } catch (err) {
+                return {
+                    approachFreq,
+                    recedeFreq,
+                    expectedSpeed,
+                    calculatedSpeed: null,
+                    error: null,
+                    tolerance,
+                    success: false,
+                    processingTime: 0,
+                    errorMessage: err.message
+                };
+            }
+        };
+
+        // Test with validation (using calculateSpeedWithValidation if available)
+        window.testDopplerValidation = async function(approachFreq, recedeFreq, expectedError = null) {
+            try {
+                const calculator = new DopplerCalculator();
+                
+                // Check if the enhanced validation method exists
+                if (typeof calculator.calculateSpeedWithValidation === 'function') {
+                    const result = calculator.calculateSpeedWithValidation(approachFreq, recedeFreq);
+                    
+                    if (expectedError) {
+                        return {
+                            approachFreq,
+                            recedeFreq,
+                            expectedError,
+                            success: false,
+                            errorMessage: 'Expected error but calculation succeeded',
+                            result: result
+                        };
+                    } else {
+                        return {
+                            approachFreq,
+                            recedeFreq,
+                            expectedError,
+                            success: result.isValid,
+                            errorMessage: result.isValid ? null : result.error,
+                            result: result
+                        };
+                    }
+                } else {
+                    // Fallback to regular calculateSpeed
+                    const speed = calculator.calculateSpeed(approachFreq, recedeFreq);
+                    
+                    if (expectedError) {
+                        return {
+                            approachFreq,
+                            recedeFreq,
+                            expectedError,
+                            success: false,
+                            errorMessage: 'Expected error but calculation succeeded',
+                            result: { speedMPH: speed, isValid: true }
+                        };
+                    } else {
+                        return {
+                            approachFreq,
+                            recedeFreq,
+                            expectedError,
+                            success: true,
+                            errorMessage: null,
+                            result: { speedMPH: speed, isValid: true }
+                        };
+                    }
+                }
+                
+            } catch (err) {
+                if (expectedError) {
+                    const success = err.message.includes(expectedError) || expectedError.includes(err.message);
+                    return {
+                        approachFreq,
+                        recedeFreq,
+                        expectedError,
+                        success,
+                        errorMessage: success ? null : `Expected "${expectedError}" but got "${err.message}"`,
+                        result: null
+                    };
+                } else {
+                    return {
+                        approachFreq,
+                        recedeFreq,
+                        expectedError,
+                        success: false,
+                        errorMessage: err.message,
+                        result: null
+                    };
+                }
+            }
+        };
+
+        // Test all basic calculations
+        window.testBasicCalculations = async function() {
+            const results = [];
+            
+            for (const testCase of testCases.basic) {
+                const result = await window.testDopplerCalculation(
+                    testCase.approachFreq,
+                    testCase.recedeFreq,
+                    testCase.expectedSpeed,
+                    testCase.tolerance
+                );
+                results.push(result);
+            }
+            
+            return {
+                totalTests: results.length,
+                passed: results.filter(r => r.success).length,
+                failed: results.filter(r => !r.success).length,
+                results
+            };
+        };
+
+        // Test edge cases
+        window.testEdgeCases = async function() {
+            const results = [];
+            
+            for (const testCase of testCases.edgeCases) {
+                const result = await window.testDopplerCalculation(
+                    testCase.approachFreq,
+                    testCase.recedeFreq,
+                    testCase.expectedSpeed,
+                    testCase.tolerance
+                );
+                results.push(result);
+            }
+            
+            return {
+                totalTests: results.length,
+                passed: results.filter(r => r.success).length,
+                failed: results.filter(r => !r.success).length,
+                results
+            };
+        };
+
+        // Test validation cases
+        window.testValidationCases = async function() {
+            const results = [];
+            
+            for (const testCase of testCases.validation) {
+                if (testCase.expectedError) {
+                    const result = await window.testDopplerValidation(
+                        testCase.approachFreq,
+                        testCase.recedeFreq,
+                        testCase.expectedError
+                    );
+                    results.push(result);
+                } else {
+                    const result = await window.testDopplerCalculation(
+                        testCase.approachFreq,
+                        testCase.recedeFreq,
+                        testCase.expectedSpeed,
+                        testCase.tolerance
+                    );
+                    results.push(result);
+                }
+            }
+            
+            return {
+                totalTests: results.length,
+                passed: results.filter(r => r.success).length,
+                failed: results.filter(r => !r.success).length,
+                results
+            };
+        };
+
+        // Test temperature and sound speed variations
+        window.testTemperatureEffects = async function() {
+            const temperatures = [0, 20, 40]; // Celsius
+            const baseFreqs = { approach: 1100, recede: 900 };
+            const results = [];
+            
+            for (const temp of temperatures) {
+                try {
+                    const calculator = new DopplerCalculator(null, temp);
+                    const speed = calculator.calculateSpeed(baseFreqs.approach, baseFreqs.recede);
+                    
+                    results.push({
+                        temperature: temp,
+                        soundSpeed: calculator.soundSpeed || 'unknown',
+                        calculatedSpeed: speed,
+                        success: true,
+                        error: null
+                    });
+                } catch (err) {
+                    results.push({
+                        temperature: temp,
+                        soundSpeed: null,
+                        calculatedSpeed: null,
+                        success: false,
+                        error: err.message
+                    });
+                }
+            }
+            
+            return {
+                totalTests: results.length,
+                passed: results.filter(r => r.success).length,
+                failed: results.filter(r => !r.success).length,
+                results
+            };
+        };
+
+        // Run all tests
+        window.runAllDopplerTests = async function() {
+            const startTime = performance.now();
+            
+            const basicResults = await window.testBasicCalculations();
+            const edgeResults = await window.testEdgeCases();
+            const validationResults = await window.testValidationCases();
+            const temperatureResults = await window.testTemperatureEffects();
+            
+            const totalTime = performance.now() - startTime;
+            
+            const totalTests = basicResults.totalTests + edgeResults.totalTests + 
+                              validationResults.totalTests + temperatureResults.totalTests;
+            const totalPassed = basicResults.passed + edgeResults.passed + 
+                               validationResults.passed + temperatureResults.passed;
+            const totalFailed = basicResults.failed + edgeResults.failed + 
+                               validationResults.failed + temperatureResults.failed;
+            
+            return {
+                summary: {
+                    totalTests,
+                    totalPassed,
+                    totalFailed,
+                    successRate: ((totalPassed / totalTests) * 100).toFixed(1),
+                    totalTime: totalTime.toFixed(1)
+                },
+                basicCalculations: basicResults,
+                edgeCases: edgeResults,
+                validation: validationResults,
+                temperatureEffects: temperatureResults
+            };
+        };
+
+        // Performance benchmark
+        window.benchmarkDopplerPerformance = async function(iterations = 1000) {
+            const calculator = new DopplerCalculator();
+            const testFreqs = { approach: 1100, recede: 900 };
+            
+            const startTime = performance.now();
+            
+            for (let i = 0; i < iterations; i++) {
+                calculator.calculateSpeed(testFreqs.approach, testFreqs.recede);
+            }
+            
+            const totalTime = performance.now() - startTime;
+            const avgTime = totalTime / iterations;
+            
+            return {
+                iterations,
+                totalTime: totalTime.toFixed(2),
+                averageTime: avgTime.toFixed(4),
+                calculationsPerSecond: Math.round(1000 / avgTime)
+            };
+        };
+
+        // Initialize and show ready status
+        document.getElementById('results').innerHTML = `
+            <h3>✅ Test Harness Ready</h3>
+            <p>Available test functions:</p>
+            <ul>
+                <li><code>testDopplerCalculation(approachFreq, recedeFreq, expectedSpeed, tolerance)</code></li>
+                <li><code>testDopplerValidation(approachFreq, recedeFreq, expectedError)</code></li>
+                <li><code>testBasicCalculations()</code></li>
+                <li><code>testEdgeCases()</code></li>
+                <li><code>testValidationCases()</code></li>
+                <li><code>testTemperatureEffects()</code></li>
+                <li><code>runAllDopplerTests()</code></li>
+                <li><code>benchmarkDopplerPerformance(iterations)</code></li>
+            </ul>
+            <p><strong>Test cases loaded:</strong> ${testCases.basic.length + testCases.edgeCases.length + testCases.validation.length} total</p>
+        `;
+    </script>
+</body>
+</html>

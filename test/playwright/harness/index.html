@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Doppler Speed Test Harness</title>
+    <script>
+        // Real FFT implementation test harness
+        
+        async function runAnalysisWithFFTMode(mode) {
+            try {
+                const response = await fetch(`http://localhost:3000/analyze/${mode}`);
+                if (!response.ok) {
+                    throw new Error(`API call failed: ${response.statusText}`);
+                }
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error(`Failed to run analysis with ${mode}:`, error);
+                throw error;
+            }
+        }
+
+        function formatTableRow(result) {
+            const errorSign = result.calculatedSpeedMph >= result.expectedSpeedMph ? '+' : '±';
+            return `| ${result.file.padEnd(12)} | ${result.expectedSpeedMph} mph (${result.expectedSpeedKmh} km/h)${(' ').repeat(Math.max(0, 7 - result.expectedSpeedMph.toString().length))} | ${result.calculatedSpeedMph} mph (${result.calculatedSpeedKmh} km/h)${(' ').repeat(Math.max(0, 6 - result.calculatedSpeedMph.toString().length))} | ${errorSign}${result.error.toFixed(1)} mph${(' ').repeat(Math.max(0, 2 - result.error.toFixed(1).length))} | ${result.strategy.padEnd(13)} | ${result.clipDuration}s${(' ').repeat(Math.max(0, 10 - result.clipDuration.toString().length))} | ${result.processingTime}ms${(' ').repeat(Math.max(0, 10 - result.processingTime.toString().length))} |`;
+        }
+
+        function formatTable(results, mode) {
+            const modeName = mode === 'WASM+SIMD' ? 'WASM+SIMD enabled FFT' : 
+                            mode === 'WASM+noSIMD' ? 'WASM+noSIMD disabled FFT' : 
+                            'JavaScript FFT implementation';
+            
+            let output = `\n${modeName}\n`;
+            output += '| File         | Expected Speed     | Calculated Speed      | Error     | Strategy Used | Clip Duration | Processing Time |\n';
+            output += '|--------------|--------------------|-----------------------|-----------|---------------|---------------|\n';
+            
+            results.forEach(result => {
+                output += formatTableRow(result) + '\n';
+            });
+            
+            return output;
+        }
+
+        window.runTest = async function() {
+            const button = document.querySelector('button');
+            const resultsDiv = document.getElementById('results');
+            
+            button.disabled = true;
+            button.textContent = 'Running Tests...';
+            resultsDiv.textContent = 'Running real FFT implementations...';
+            
+            try {
+                const fftModes = ['WASM+SIMD', 'WASM+noSIMD', 'JavaScript FFT implementation'];
+                const allResults = [];
+                let combinedOutput = '';
+                
+                for (const mode of fftModes) {
+                    const modeName = mode === 'WASM+SIMD' ? 'WASM+SIMD enabled FFT' : 
+                                    mode === 'WASM+noSIMD' ? 'WASM+noSIMD disabled FFT' : 
+                                    'JavaScript FFT implementation';
+                    
+                    resultsDiv.textContent = `Running ${modeName}...`;
+                    
+                    const analysisResult = await runAnalysisWithFFTMode(mode);
+                    
+                    if (analysisResult.results && analysisResult.results.length > 0) {
+                        combinedOutput += formatTable(analysisResult.results, mode);
+                        analysisResult.results.forEach(result => {
+                            allResults.push({ ...result, fftMode: mode });
+                        });
+                    } else {
+                        // Fallback if parsing failed
+                        combinedOutput += `\n${modeName}\nAnalysis failed - check server logs\n`;
+                    }
+                }
+
+                console.log('Test Results:', allResults);
+                resultsDiv.textContent = combinedOutput;
+                
+                // Store results for Playwright to access
+                window.testResults = allResults;
+                window.tableOutput = combinedOutput;
+            } catch (error) {
+                console.error('Test failed:', error);
+                resultsDiv.textContent = `Error: ${error.message}\n\nMake sure the API server is running on port 3000`;
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Run Tests';
+            }
+        };
+    </script>
+</head>
+<body>
+    <h1>Doppler Speed Test Harness</h1>
+    <button onclick="runTest()">Run Tests</button>
+    <pre id="results" style="font-family: monospace; white-space: pre; background: #f5f5f5; padding: 10px; border: 1px solid #ccc;"></pre>
+</body>
+</html>

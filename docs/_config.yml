@@ -1,0 +1,33 @@
+# GitHub Pages configuration for Car Speed Via Doppler
+
+# Enable GitHub Pages
+source: docs
+destination: _site
+
+# Plugins
+plugins:
+  - jekyll-optional-front-matter
+
+# Include files that start with underscore
+include:
+  - _headers
+
+# Exclude unnecessary files
+exclude:
+  - README.md
+  - test-deployment.html
+
+# MIME types for proper file serving
+defaults:
+  - scope:
+      path: "**/*.wasm"
+    values:
+      layout: null
+  - scope:
+      path: "**/*.wav"
+    values:
+      layout: null
+  - scope:
+      path: "**/*.js"
+    values:
+      layout: null

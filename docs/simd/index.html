@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WASM+SIMD enabled FFT - Doppler Speed Analysis</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        .implementation-badge {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 25px;
+            text-align: center;
+            margin: 20px 0;
+            font-weight: bold;
+        }
+        .controls {
+            text-align: center;
+            margin: 20px 0;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        button:hover:not(:disabled) {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        .results {
+            background: #f8f8f8;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            margin-top: 20px;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        .navigation {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .nav-link {
+            display: inline-block;
+            margin: 0 10px;
+            padding: 8px 16px;
+            background: #2196F3;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+        }
+        .nav-link:hover {
+            background: #1976D2;
+        }
+        .nav-link.current {
+            background: #4CAF50;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 WASM+SIMD enabled FFT</h1>
+        
+        <div class="implementation-badge">
+            WebAssembly with SIMD Optimizations - Maximum Performance
+        </div>
+        
+        <div class="navigation">
+            <a href="../" class="nav-link">🏠 Home</a>
+            <a href="index.html" class="nav-link current">🚀 WASM+SIMD</a>
+            <a href="../non-simd/" class="nav-link">⚡ WASM+noSIMD</a>
+            <a href="../pure-js/" class="nav-link">📝 Pure JS</a>
+        </div>
+        
+        <div class="controls">
+            <button id="runTests" onclick="runWasmSimdTests()">
+                🔬 Run WASM+SIMD Analysis
+            </button>
+        </div>
+        
+        <div id="results" class="results">
+Click "Run WASM+SIMD Analysis" to analyze all six test audio files.
+
+Expected WASM+SIMD Performance:
+• Fastest FFT processing (50-200ms per file)
+• Highest accuracy for speed calculations
+• Requires SIMD-capable browser
+• Best for production applications
+
+Test Files: 23_mph.wav, 28_mph.wav, 30_mph.wav, 30_mph_2.wav, 33_mph.wav, 37_mph.wav
+        </div>
+    </div>
+
+    <script type="module">
+        const testFiles = [
+            { file: '23_mph.wav', expectedMph: 23 },
+            { file: '28_mph.wav', expectedMph: 28 },
+            { file: '30_mph.wav', expectedMph: 30 },
+            { file: '30_mph_2.wav', expectedMph: 30 },
+            { file: '33_mph.wav', expectedMph: 33 },
+            { file: '37_mph.wav', expectedMph: 37 }
+        ];
+
+        window.runWasmSimdTests = runWasmSimdTests;
+
+        async function runWasmSimdTests() {
+            const button = document.getElementById('runTests');
+            const resultsDiv = document.getElementById('results');
+            
+            button.disabled = true;
+            button.textContent = '🔄 Running WASM+SIMD Tests...';
+            
+            try {
+                let output = 'WASM+SIMD enabled FFT\n';
+                output += '=' .repeat(50) + '\n\n';
+                
+                const results = await testWasmSimd();
+                output += formatResults(results);
+                
+                resultsDiv.textContent = output;
+                
+            } catch (error) {
+                resultsDiv.textContent = `❌ Error: ${error.message}\n\nMake sure your browser supports WASM+SIMD.\nTry Chrome 91+ or Firefox 89+.`;
+                console.error('WASM+SIMD test error:', error);
+            } finally {
+                button.disabled = false;
+                button.textContent = '🔬 Run WASM+SIMD Analysis';
+            }
+        }
+
+        async function testWasmSimd() {
+            // Import WASM+SIMD implementation
+            const cacheBust = Date.now();
+            const { default: SpectrumAnalyzer } = await import('./spectrum-analyzer.js');
+            const AudioProcessor = (await import(`../shared/audio-utils.js?v=${cacheBust}`)).default;
+            const AudioAnalyzer = (await import(`../shared/audio-analyzer.js?v=${cacheBust}`)).default;
+            
+            const results = [];
+            const analyzer = new AudioAnalyzer();
+            
+            for (const testCase of testFiles) {
+                const startTime = performance.now();
+                
+                try {
+                    // Load audio file
+                    const audioBuffer = await loadAudioFile(`../shared/${testCase.file}`);
+                    const { samples, sampleRate } = AudioProcessor.decodeAudioBuffer(audioBuffer);
+                    const normalizedSamples = AudioProcessor.normalizeAmplitude(samples);
+                    
+                    // Extract sections using peak RMS energy detection
+                    const sections = analyzer.extractSections(normalizedSamples, sampleRate, 'peak_rms_energy');
+                    
+                    // Analyze frequencies with WASM+SIMD
+                    const approachAnalyzer = new SpectrumAnalyzer(sections.approaching, sampleRate, { windowType: 'hamming' });
+                    const recedeAnalyzer = new SpectrumAnalyzer(sections.receding, sampleRate, { windowType: 'hamming' });
+                    
+                    await approachAnalyzer.calculatePowerSpectrum();
+                    await recedeAnalyzer.calculatePowerSpectrum();
+                    
+                    const approachFreqs = analyzer.filterReasonableFrequencies(approachAnalyzer.getStrongestFrequencies(5));
+                    const recedeFreqs = analyzer.filterReasonableFrequencies(recedeAnalyzer.getStrongestFrequencies(5));
+                    
+                    // Calculate speed
+                    const speedResult = await analyzer.findBestSpeedCalculation(approachFreqs, recedeFreqs, testCase.expectedMph);
+                    
+                    const processingTime = performance.now() - startTime;
+                    
+                    if (speedResult.valid) {
+                        results.push({
+                            file: testCase.file,
+                            expectedSpeedMph: testCase.expectedMph,
+                            expectedSpeedKmh: (testCase.expectedMph * 1.60934).toFixed(1),
+                            calculatedSpeedMph: speedResult.speedMph.toFixed(1),
+                            calculatedSpeedKmh: speedResult.speedKmh.toFixed(1),
+                            error: speedResult.error.toFixed(1),
+                            strategy: speedResult.strategy,
+                            sectioning: sections.sectioningMethod || 'unknown',
+                            clipDuration: (normalizedSamples.length / sampleRate).toFixed(2),
+                            processingTime: Math.round(processingTime)
+                        });
+                    } else {
+                        results.push({
+                            file: testCase.file,
+                            expectedSpeedMph: testCase.expectedMph,
+                            expectedSpeedKmh: (testCase.expectedMph * 1.60934).toFixed(1),
+                            calculatedSpeedMph: 'FAILED',
+                            calculatedSpeedKmh: 'FAILED',
+                            error: 'N/A',
+                            strategy: 'N/A',
+                            sectioning: sections.sectioningMethod || 'unknown',
+                            clipDuration: (normalizedSamples.length / sampleRate).toFixed(2),
+                            processingTime: Math.round(processingTime)
+                        });
+                    }
+                    
+                } catch (error) {
+                    const processingTime = performance.now() - startTime;
+                    results.push({
+                        file: testCase.file,
+                        expectedSpeedMph: testCase.expectedMph,
+                        expectedSpeedKmh: (testCase.expectedMph * 1.60934).toFixed(1),
+                        calculatedSpeedMph: 'ERROR',
+                        calculatedSpeedKmh: 'ERROR',
+                        error: 'N/A',
+                        strategy: 'N/A',
+                        sectioning: 'N/A',
+                        clipDuration: 'N/A',
+                        processingTime: Math.round(processingTime)
+                    });
+                    console.error(`Error analyzing ${testCase.file}:`, error);
+                }
+            }
+            
+            return results;
+        }
+
+        async function loadAudioFile(url) {
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`Failed to load audio file: ${url}`);
+            }
+            
+            const arrayBuffer = await response.arrayBuffer();
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+            
+            return audioBuffer;
+        }
+
+        function formatResults(results) {
+            let output = '| File         | Expected Speed     | Calculated Speed     | Error      | Strategy | Sectioning | Clip Duration | Processing Time |\n';
+            output += '|--------------|--------------------|--------------------- |------------|----------|------------|---------------|------------------|\n';
+            
+            let totalTime = 0;
+            let successCount = 0;
+            let totalError = 0;
+            
+            for (const result of results) {
+                const errorSign = result.calculatedSpeedMph !== 'FAILED' && result.calculatedSpeedMph !== 'ERROR' && 
+                                parseFloat(result.calculatedSpeedMph) >= result.expectedSpeedMph ? '+' : '±';
+                
+                output += `| ${result.file.padEnd(12)} | ${result.expectedSpeedMph} mph (${result.expectedSpeedKmh} km/h)${(' ').repeat(Math.max(0, 7 - result.expectedSpeedMph.toString().length))} | `;
+                
+                if (result.calculatedSpeedMph === 'FAILED' || result.calculatedSpeedMph === 'ERROR') {
+                    output += `${result.calculatedSpeedMph.padEnd(20)} | ${result.error.padEnd(10)} | ${result.strategy.padEnd(8)} | ${result.sectioning.padEnd(10)} | ${(result.clipDuration + 's').padEnd(13)} | ${(result.processingTime + 'ms').padEnd(16)} |\n`;
+                } else {
+                    const calculatedSpeed = `${result.calculatedSpeedMph} mph (${result.calculatedSpeedKmh} km/h)`;
+                    const error = `${errorSign}${result.error} mph`;
+                    output += `${calculatedSpeed.padEnd(20)} | ${error.padEnd(10)} | ${result.strategy.padEnd(8)} | ${result.sectioning.padEnd(10)} | ${(result.clipDuration + 's').padEnd(13)} | ${(result.processingTime + 'ms').padEnd(16)} |\n`;
+                    successCount++;
+                    totalError += parseFloat(result.error);
+                }
+                
+                totalTime += result.processingTime;
+            }
+            
+            // Add summary
+            output += '\n';
+            output += `📊 WASM+SIMD Performance Summary:\n`;
+            output += `   • Success Rate: ${successCount}/${results.length} (${((successCount/results.length)*100).toFixed(1)}%)\n`;
+            output += `   • Total Processing Time: ${totalTime}ms\n`;
+            output += `   • Average Processing Time: ${Math.round(totalTime/results.length)}ms\n`;
+            if (successCount > 0) {
+                output += `   • Average Error: ${(totalError/successCount).toFixed(1)} mph\n`;
+                output += `   • Average Accuracy: ${(100 - (totalError/successCount/30)*100).toFixed(1)}%\n`;
+            }
+            
+            // Show appropriate completion message based on results
+            if (successCount === 0) {
+                output += '\n❌ WASM+SIMD analysis FAILED - All tests failed!\n';
+                output += 'Check browser console for detailed error messages.\n';
+                output += 'WASM+SIMD may not be supported in your browser.\n';
+            } else if (successCount < results.length) {
+                output += '\n⚠️  WASM+SIMD analysis PARTIALLY completed!\n';
+                output += `${results.length - successCount} of ${results.length} tests failed - check console for errors.\n`;
+            } else {
+                output += '\n🚀 WASM+SIMD analysis completed successfully!\n';
+            }
+            
+            output += '\n🔍 Strategy Explanations:\n';
+            output += '   • Primary: Standard frequency matching with default parameters\n';
+            output += '   • Secondary: Relaxed speed limits (0-500 mph) with higher expected speed\n';
+            output += '   • Tertiary: Very lenient matching, tries all frequency combinations\n';
+            output += '   • Algorithm chooses lowest reasonable speed (10-100 mph range)\n';
+            
+            return output;
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SpectrumAnalyzer Browser Test Harness</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        #results { background: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .pass { color: green; }
+        .fail { color: red; }
+    </style>
+</head>
+<body>
+    <h1>🔬 SpectrumAnalyzer Browser Test Harness</h1>
+    <div id="results">Loading test harness...</div>
+
+    <script type="module">
+        import SpectrumAnalyzer from '../../../docs/shared/spectrum-analyzer.js';
+
+        // Test signal generators
+        function createTestSineWave(frequency, amplitude, duration, sampleRate) {
+            const samples = [];
+            const totalSamples = Math.floor(duration * sampleRate);
+            for (let i = 0; i < totalSamples; i++) {
+                const time = i / sampleRate;
+                samples.push(amplitude * Math.sin(2 * Math.PI * frequency * time));
+            }
+            return samples;
+        }
+
+        function createComplexTestSignal(sampleRate = 8000, duration = 1.0) {
+            const samples = [];
+            const totalSamples = Math.floor(duration * sampleRate);
+            
+            for (let i = 0; i < totalSamples; i++) {
+                const time = i / sampleRate;
+                // Multi-frequency test signal
+                const signal = 
+                    0.5 * Math.sin(2 * Math.PI * 440 * time) +   // A4 note
+                    0.3 * Math.sin(2 * Math.PI * 880 * time) +   // A5 note  
+                    0.2 * Math.sin(2 * Math.PI * 1320 * time);   // E6 note
+                samples.push(signal);
+            }
+            return samples;
+        }
+
+        function createNoiseTestSignal(sampleRate = 8000, duration = 0.5) {
+            const samples = [];
+            const totalSamples = Math.floor(duration * sampleRate);
+            
+            for (let i = 0; i < totalSamples; i++) {
+                // White noise
+                samples.push((Math.random() - 0.5) * 2);
+            }
+            return samples;
+        }
+
+        // Main test function accessible to Playwright
+        window.testSpectrumAnalyzer = async function(fftMode, testType = 'sine') {
+            try {
+                let samples, expectedPeak;
+                
+                switch (testType) {
+                    case 'sine':
+                        samples = createTestSineWave(1000, 1.0, 1.0, 8000);
+                        expectedPeak = 1000;
+                        break;
+                    case 'complex':
+                        samples = createComplexTestSignal(8000, 1.0);
+                        expectedPeak = 440; // Should find strongest component
+                        break;
+                    case 'noise':
+                        samples = createNoiseTestSignal(8000, 0.5);
+                        expectedPeak = null; // No specific peak expected
+                        break;
+                    default:
+                        throw new Error(`Unknown test type: ${testType}`);
+                }
+
+                const analyzer = new SpectrumAnalyzer(samples, 8000, { 
+                    fftMode: fftMode,
+                    windowType: 'hamming'
+                });
+                
+                const startTime = performance.now();
+                await analyzer.calculatePowerSpectrum();
+                const processingTime = performance.now() - startTime;
+                
+                const peakFreq = analyzer.findPeakFrequency();
+                const strongestFreqs = analyzer.getStrongestFrequencies(5);
+                const implInfo = analyzer.getImplementationInfo();
+                
+                let success = true;
+                let error = null;
+                
+                if (testType !== 'noise' && expectedPeak) {
+                    const frequencyError = Math.abs(peakFreq - expectedPeak);
+                    success = frequencyError < 50; // 50Hz tolerance
+                    if (!success) {
+                        error = `Peak frequency error: ${frequencyError.toFixed(1)}Hz (expected ${expectedPeak}Hz, got ${peakFreq.toFixed(1)}Hz)`;
+                    }
+                }
+                
+                return {
+                    fftMode,
+                    testType,
+                    peakFreq: peakFreq.toFixed(1),
+                    expectedPeak,
+                    processingTime: processingTime.toFixed(1),
+                    strongestFreqs: strongestFreqs.map(f => ({
+                        frequency: f.frequency.toFixed(1),
+                        power: f.power.toFixed(6)
+                    })),
+                    implementation: implInfo,
+                    success,
+                    error,
+                    samplesLength: samples.length,
+                    sampleRate: 8000
+                };
+                
+            } catch (err) {
+                return {
+                    fftMode,
+                    testType,
+                    success: false,
+                    error: err.message,
+                    processingTime: 0
+                };
+            }
+        };
+
+        // Test all FFT implementations
+        window.testAllFFTImplementations = async function(testType = 'sine') {
+            const implementations = ['WASM+SIMD', 'WASM+noSIMD', 'JavaScript'];
+            const results = [];
+            
+            for (const impl of implementations) {
+                const result = await window.testSpectrumAnalyzer(impl, testType);
+                results.push(result);
+            }
+            
+            return results;
+        };
+
+        // Auto-detection test
+        window.testAutoDetection = async function() {
+            return await window.testSpectrumAnalyzer('auto', 'sine');
+        };
+
+        // Consistency test across implementations
+        window.testConsistency = async function() {
+            const results = await window.testAllFFTImplementations('sine');
+            const successfulResults = results.filter(r => r.success);
+            
+            if (successfulResults.length < 2) {
+                return {
+                    success: false,
+                    error: 'Not enough successful implementations to compare',
+                    results
+                };
+            }
+            
+            // Check if peak frequencies are consistent
+            const peakFreqs = successfulResults.map(r => parseFloat(r.peakFreq));
+            const maxDiff = Math.max(...peakFreqs) - Math.min(...peakFreqs);
+            const consistent = maxDiff < 20; // 20Hz tolerance between implementations
+            
+            return {
+                success: consistent,
+                maxFrequencyDifference: maxDiff.toFixed(1),
+                results,
+                error: consistent ? null : `Implementations disagree by ${maxDiff.toFixed(1)}Hz`
+            };
+        };
+
+        // Performance comparison test  
+        window.testPerformance = async function() {
+            const results = await window.testAllFFTImplementations('complex');
+            
+            // Sort by processing time
+            const successfulResults = results.filter(r => r.success);
+            successfulResults.sort((a, b) => parseFloat(a.processingTime) - parseFloat(b.processingTime));
+            
+            return {
+                fastest: successfulResults[0]?.fftMode || 'none',
+                slowest: successfulResults[successfulResults.length - 1]?.fftMode || 'none',
+                results: successfulResults,
+                performanceRanking: successfulResults.map((r, i) => ({
+                    rank: i + 1,
+                    implementation: r.fftMode,
+                    time: `${r.processingTime}ms`
+                }))
+            };
+        };
+
+        // Initialize and show ready status
+        document.getElementById('results').innerHTML = `
+            <h3>✅ Test Harness Ready</h3>
+            <p>Available test functions:</p>
+            <ul>
+                <li><code>testSpectrumAnalyzer(fftMode, testType)</code></li>
+                <li><code>testAllFFTImplementations(testType)</code></li>
+                <li><code>testAutoDetection()</code></li>
+                <li><code>testConsistency()</code></li>
+                <li><code>testPerformance()</code></li>
+            </ul>
+            <p><strong>FFT Modes:</strong> 'WASM+SIMD', 'WASM+noSIMD', 'JavaScript', 'auto'</p>
+            <p><strong>Test Types:</strong> 'sine', 'complex', 'noise'</p>
+        `;
+    </script>
+</body>
+</html>

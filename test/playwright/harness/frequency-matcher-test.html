@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FrequencyMatcher Browser Test Harness</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        #results { background: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .pass { color: green; }
+        .fail { color: red; }
+    </style>
+</head>
+<body>
+    <h1>🎭 FrequencyMatcher Browser Test Harness</h1>
+    <div id="results">Loading test harness...</div>
+
+    <script type="module">
+        import DopplerCalculator from '../../../docs/shared/doppler-calculator.js';
+
+        // Mock FrequencyMatcher (since it doesn't exist in docs/shared yet)
+        // We'll test the algorithm logic that would be in the browser version
+        class FrequencyMatcher {
+            constructor(dopplerCalculator) {
+                this.calculator = dopplerCalculator;
+                this.confidenceThreshold = 0.7;
+                this.maxSpeedMph = 200;
+                this.minSpeedMph = 1;
+            }
+
+            findBestMatches(approachFreqs, recedeFreqs, maxMatches = 5) {
+                const matches = [];
+                
+                // Generate all possible frequency pairs
+                for (let i = 0; i < approachFreqs.length; i++) {
+                    for (let j = 0; j < recedeFreqs.length; j++) {
+                        const approachFreq = approachFreqs[i];
+                        const recedeFreq = recedeFreqs[j];
+                        
+                        // Skip invalid pairs
+                        if (approachFreq.frequency <= recedeFreq.frequency) continue;
+                        
+                        try {
+                            const speed = this.calculator.calculateSpeed(
+                                approachFreq.frequency, 
+                                recedeFreq.frequency
+                            );
+                            
+                            // Filter reasonable speeds
+                            if (speed >= this.minSpeedMph && speed <= this.maxSpeedMph) {
+                                const confidence = this.calculateConfidence(
+                                    approachFreq, recedeFreq, speed
+                                );
+                                
+                                if (confidence >= this.confidenceThreshold) {
+                                    matches.push({
+                                        approachFreq: approachFreq.frequency,
+                                        recedeFreq: recedeFreq.frequency,
+                                        approachPower: approachFreq.power,
+                                        recedePower: recedeFreq.power,
+                                        speed,
+                                        confidence,
+                                        powerRatio: Math.min(approachFreq.power, recedeFreq.power) / 
+                                                   Math.max(approachFreq.power, recedeFreq.power)
+                                    });
+                                }
+                            }
+                        } catch (err) {
+                            // Skip invalid calculations
+                            continue;
+                        }
+                    }
+                }
+                
+                // Sort by confidence (descending) then by power ratio (descending)
+                matches.sort((a, b) => {
+                    if (Math.abs(a.confidence - b.confidence) > 0.01) {
+                        return b.confidence - a.confidence;
+                    }
+                    return b.powerRatio - a.powerRatio;
+                });
+                
+                return matches.slice(0, maxMatches);
+            }
+
+            calculateConfidence(approachFreq, recedeFreq, speed) {
+                // Simple confidence calculation based on power levels and frequency separation
+                const powerConfidence = Math.min(approachFreq.power, recedeFreq.power) / 
+                                       Math.max(approachFreq.power, recedeFreq.power);
+                const freqSeparation = (approachFreq.frequency - recedeFreq.frequency) / approachFreq.frequency;
+                const separationConfidence = Math.min(freqSeparation * 10, 1.0); // Favor larger separations
+                
+                return (powerConfidence * 0.6 + separationConfidence * 0.4);
+            }
+
+            validateMatch(match) {
+                return {
+                    isValid: match.confidence >= this.confidenceThreshold &&
+                            match.speed >= this.minSpeedMph &&
+                            match.speed <= this.maxSpeedMph &&
+                            match.approachFreq > match.recedeFreq,
+                    confidence: match.confidence,
+                    speed: match.speed,
+                    reason: match.confidence < this.confidenceThreshold ? 'Low confidence' :
+                           match.speed < this.minSpeedMph ? 'Speed too low' :
+                           match.speed > this.maxSpeedMph ? 'Speed too high' :
+                           match.approachFreq <= match.recedeFreq ? 'Invalid frequency order' : 'Valid'
+                };
+            }
+        }
+
+        // Test data generators
+        function generateTestFrequencies(baseFreq = 1000, count = 10, spread = 200) {
+            const frequencies = [];
+            for (let i = 0; i < count; i++) {
+                const freq = baseFreq + (Math.random() - 0.5) * spread;
+                const power = Math.random() * 0.001 + 0.0001; // Random power levels
+                frequencies.push({ frequency: freq, power });
+            }
+            return frequencies.sort((a, b) => b.power - a.power); // Sort by power descending
+        }
+
+        function generateDopplerFrequencies(baseFreq = 1000, speed = 30) {
+            // Generate realistic Doppler shifted frequencies
+            const calculator = new DopplerCalculator();
+            const soundSpeed = 343; // m/s at 20°C
+            const speedMs = speed * 0.44704; // Convert mph to m/s
+            
+            const approachFreq = baseFreq * (soundSpeed + speedMs) / soundSpeed;
+            const recedeFreq = baseFreq * (soundSpeed - speedMs) / soundSpeed;
+            
+            // Add some noise and additional frequencies
+            const approachFreqs = [
+                { frequency: approachFreq, power: 0.001 },
+                { frequency: approachFreq + Math.random() * 50 - 25, power: 0.0005 },
+                { frequency: baseFreq + Math.random() * 100 - 50, power: 0.0003 }
+            ];
+            
+            const recedeFreqs = [
+                { frequency: recedeFreq, power: 0.0008 },
+                { frequency: recedeFreq + Math.random() * 30 - 15, power: 0.0004 },
+                { frequency: baseFreq + Math.random() * 80 - 40, power: 0.0002 }
+            ];
+            
+            return { approachFreqs, recedeFreqs, expectedSpeed: speed };
+        }
+
+        // Main test functions accessible to Playwright
+        window.testFrequencyMatching = async function(approachFreqs, recedeFreqs, expectedMatches = 1) {
+            try {
+                const calculator = new DopplerCalculator();
+                const matcher = new FrequencyMatcher(calculator);
+                
+                const startTime = performance.now();
+                const matches = matcher.findBestMatches(approachFreqs, recedeFreqs, 10);
+                const processingTime = performance.now() - startTime;
+                
+                return {
+                    inputApproachFreqs: approachFreqs.length,
+                    inputRecedeFreqs: recedeFreqs.length,
+                    foundMatches: matches.length,
+                    expectedMatches,
+                    matches,
+                    processingTime: processingTime.toFixed(2),
+                    success: matches.length >= expectedMatches,
+                    bestMatch: matches[0] || null
+                };
+                
+            } catch (err) {
+                return {
+                    success: false,
+                    error: err.message,
+                    matches: [],
+                    processingTime: 0
+                };
+            }
+        };
+
+        window.testDopplerFrequencyMatching = async function(baseFreq = 1000, speed = 30) {
+            try {
+                const { approachFreqs, recedeFreqs, expectedSpeed } = generateDopplerFrequencies(baseFreq, speed);
+                const result = await window.testFrequencyMatching(approachFreqs, recedeFreqs, 1);
+                
+                if (result.success && result.bestMatch) {
+                    const speedError = Math.abs(result.bestMatch.speed - expectedSpeed);
+                    const speedSuccess = speedError < expectedSpeed * 0.2; // 20% tolerance
+                    
+                    return {
+                        ...result,
+                        expectedSpeed,
+                        calculatedSpeed: result.bestMatch.speed,
+                        speedError: speedError.toFixed(1),
+                        speedSuccess,
+                        overallSuccess: result.success && speedSuccess
+                    };
+                } else {
+                    return {
+                        ...result,
+                        expectedSpeed,
+                        calculatedSpeed: null,
+                        speedError: null,
+                        speedSuccess: false,
+                        overallSuccess: false
+                    };
+                }
+                
+            } catch (err) {
+                return {
+                    success: false,
+                    error: err.message,
+                    expectedSpeed: speed,
+                    overallSuccess: false
+                };
+            }
+        };
+
+        window.testConfidenceCalculation = async function() {
+            const calculator = new DopplerCalculator();
+            const matcher = new FrequencyMatcher(calculator);
+            
+            const testCases = [
+                { approachFreq: { frequency: 1100, power: 0.001 }, recedeFreq: { frequency: 900, power: 0.001 }, expectedHigh: true },
+                { approachFreq: { frequency: 1050, power: 0.001 }, recedeFreq: { frequency: 950, power: 0.0001 }, expectedHigh: false },
+                { approachFreq: { frequency: 1010, power: 0.0001 }, recedeFreq: { frequency: 990, power: 0.0001 }, expectedHigh: false }
+            ];
+            
+            const results = [];
+            
+            for (const testCase of testCases) {
+                const speed = calculator.calculateSpeed(
+                    testCase.approachFreq.frequency,
+                    testCase.recedeFreq.frequency
+                );
+                
+                const confidence = matcher.calculateConfidence(
+                    testCase.approachFreq,
+                    testCase.recedeFreq,
+                    speed
+                );
+                
+                const isHigh = confidence >= matcher.confidenceThreshold;
+                const success = isHigh === testCase.expectedHigh;
+                
+                results.push({
+                    approachFreq: testCase.approachFreq.frequency,
+                    recedeFreq: testCase.recedeFreq.frequency,
+                    speed: speed.toFixed(1),
+                    confidence: confidence.toFixed(3),
+                    expectedHigh: testCase.expectedHigh,
+                    actualHigh: isHigh,
+                    success
+                });
+            }
+            
+            return {
+                totalTests: results.length,
+                passed: results.filter(r => r.success).length,
+                failed: results.filter(r => !r.success).length,
+                results
+            };
+        };
+
+        window.testMatchValidation = async function() {
+            const calculator = new DopplerCalculator();
+            const matcher = new FrequencyMatcher(calculator);
+            
+            const testMatches = [
+                { approachFreq: 1100, recedeFreq: 900, approachPower: 0.001, recedePower: 0.001, speed: 60, confidence: 0.8, expectValid: true },
+                { approachFreq: 1010, recedeFreq: 990, approachPower: 0.001, recedePower: 0.001, speed: 5, confidence: 0.5, expectValid: false },
+                { approachFreq: 900, recedeFreq: 1100, approachPower: 0.001, recedePower: 0.001, speed: 60, confidence: 0.8, expectValid: false },
+                { approachFreq: 2000, recedeFreq: 500, approachPower: 0.001, recedePower: 0.001, speed: 250, confidence: 0.9, expectValid: false }
+            ];
+            
+            const results = [];
+            
+            for (const testMatch of testMatches) {
+                const validation = matcher.validateMatch(testMatch);
+                const success = validation.isValid === testMatch.expectValid;
+                
+                results.push({
+                    match: testMatch,
+                    validation,
+                    expectedValid: testMatch.expectValid,
+                    actualValid: validation.isValid,
+                    success,
+                    reason: validation.reason
+                });
+            }
+            
+            return {
+                totalTests: results.length,
+                passed: results.filter(r => r.success).length,
+                failed: results.filter(r => !r.success).length,
+                results
+            };
+        };
+
+        window.testPerformanceWithLargeDataset = async function() {
+            const approachFreqs = generateTestFrequencies(1100, 50, 300);
+            const recedeFreqs = generateTestFrequencies(900, 50, 300);
+            
+            const startTime = performance.now();
+            const result = await window.testFrequencyMatching(approachFreqs, recedeFreqs, 1);
+            const totalTime = performance.now() - startTime;
+            
+            return {
+                ...result,
+                totalProcessingTime: totalTime.toFixed(2),
+                pairsEvaluated: approachFreqs.length * recedeFreqs.length,
+                pairsPerSecond: Math.round((approachFreqs.length * recedeFreqs.length) / (totalTime / 1000))
+            };
+        };
+
+        window.runAllFrequencyMatcherTests = async function() {
+            const startTime = performance.now();
+            
+            // Test basic matching
+            const basicResult = await window.testDopplerFrequencyMatching(1000, 30);
+            
+            // Test confidence calculation
+            const confidenceResult = await window.testConfidenceCalculation();
+            
+            // Test validation
+            const validationResult = await window.testMatchValidation();
+            
+            // Test performance
+            const performanceResult = await window.testPerformanceWithLargeDataset();
+            
+            const totalTime = performance.now() - startTime;
+            
+            const totalTests = 1 + confidenceResult.totalTests + validationResult.totalTests + 1;
+            const totalPassed = (basicResult.overallSuccess ? 1 : 0) + 
+                               confidenceResult.passed + validationResult.passed + 
+                               (performanceResult.success ? 1 : 0);
+            
+            return {
+                summary: {
+                    totalTests,
+                    totalPassed,
+                    totalFailed: totalTests - totalPassed,
+                    successRate: ((totalPassed / totalTests) * 100).toFixed(1),
+                    totalTime: totalTime.toFixed(1)
+                },
+                basicMatching: basicResult,
+                confidenceCalculation: confidenceResult,
+                validation: validationResult,
+                performance: performanceResult
+            };
+        };
+
+        // Initialize and show ready status
+        document.getElementById('results').innerHTML = `
+            <h3>✅ Test Harness Ready</h3>
+            <p>Available test functions:</p>
+            <ul>
+                <li><code>testFrequencyMatching(approachFreqs, recedeFreqs, expectedMatches)</code></li>
+                <li><code>testDopplerFrequencyMatching(baseFreq, speed)</code></li>
+                <li><code>testConfidenceCalculation()</code></li>
+                <li><code>testMatchValidation()</code></li>
+                <li><code>testPerformanceWithLargeDataset()</code></li>
+                <li><code>runAllFrequencyMatcherTests()</code></li>
+            </ul>
+            <p><strong>Note:</strong> This harness includes a mock FrequencyMatcher implementation for testing the algorithm logic.</p>
+        `;
+    </script>
+</body>
+</html>

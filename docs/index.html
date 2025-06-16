@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Car Speed Via Doppler - Web-Based Speed Detection</title>
+    <meta name="description" content="Web-based car speed detection using the Doppler effect. Upload audio recordings of passing vehicles to estimate their speed.">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        .header h1 {
+            font-size: 2.5em;
+            margin: 0;
+            color: #2c3e50;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+        .header .tagline {
+            font-size: 1.2em;
+            color: #7f8c8d;
+            margin: 10px 0;
+        }
+        .header .version {
+            background: #3498db;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            display: inline-block;
+            margin-top: 10px;
+        }
+        .description {
+            background: linear-gradient(135deg, #e8f6f3 0%, #d5e7ed 100%);
+            padding: 25px;
+            border-radius: 10px;
+            margin-bottom: 40px;
+            border-left: 5px solid #16a085;
+        }
+        .description h2 {
+            margin-top: 0;
+            color: #2c3e50;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+        .stat-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            border: 2px solid #e9ecef;
+        }
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #27ae60;
+        }
+        .stat-label {
+            color: #6c757d;
+            margin-top: 5px;
+        }
+        .implementations {
+            display: grid;
+            gap: 25px;
+            margin: 40px 0;
+        }
+        .implementation-card {
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            padding: 25px;
+            text-align: center;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            color: inherit;
+            background: white;
+            position: relative;
+            overflow: hidden;
+        }
+        .implementation-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: var(--accent-color);
+            transform: scaleX(0);
+            transition: transform 0.3s ease;
+        }
+        .implementation-card:hover::before {
+            transform: scaleX(1);
+        }
+        .implementation-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            border-color: var(--accent-color);
+        }
+        .simd-card {
+            --accent-color: #e74c3c;
+        }
+        .wasm-card {
+            --accent-color: #f39c12;
+        }
+        .js-card {
+            --accent-color: #3498db;
+        }
+        .card-icon {
+            font-size: 3em;
+            margin-bottom: 15px;
+        }
+        .card-title {
+            font-size: 1.4em;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+        .card-subtitle {
+            color: #7f8c8d;
+            margin-bottom: 15px;
+        }
+        .card-features {
+            list-style: none;
+            padding: 0;
+            margin: 15px 0;
+        }
+        .card-features li {
+            padding: 5px 0;
+            color: #555;
+        }
+        .card-features li:before {
+            content: "✓ ";
+            color: #27ae60;
+            font-weight: bold;
+        }
+        .card-button {
+            background: var(--accent-color);
+            color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 25px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+            margin-top: 15px;
+        }
+        .card-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        .requirements {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 30px 0;
+        }
+        .requirements h3 {
+            margin-top: 0;
+            color: #856404;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #e9ecef;
+            color: #6c757d;
+        }
+        .footer a {
+            color: #3498db;
+            text-decoration: none;
+        }
+        .footer a:hover {
+            text-decoration: underline;
+        }
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+                margin: 10px;
+            }
+            .header h1 {
+                font-size: 2em;
+            }
+            .stats {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚗💨 Car Speed Via Doppler</h1>
+            <p class="tagline">Web-based speed detection using the Doppler effect</p>
+            <span class="version">v2.0.0 - 100% Browser Compatible</span>
+        </div>
+
+        <div class="description">
+            <h2>🎯 How It Works</h2>
+            <p>Upload audio recordings of passing vehicles to estimate their speed using the <strong>Doppler effect</strong>. When a car approaches, sound frequency increases; when it recedes, frequency decreases. Our advanced algorithms analyze this frequency shift to calculate vehicle speed.</p>
+            <p><strong>⚠️ Educational Use Only:</strong> This tool provides rough estimates and is not accurate enough for law enforcement or precise measurements.</p>
+        </div>
+
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-number">100%</div>
+                <div class="stat-label">Detection Success Rate</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">~11 mph</div>
+                <div class="stat-label">Average Error</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">30-200ms</div>
+                <div class="stat-label">Processing Speed</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">6/6</div>
+                <div class="stat-label">Test Files Analyzed</div>
+            </div>
+        </div>
+
+        <h2 style="text-align: center; color: #2c3e50; margin: 40px 0 30px 0;">Choose Your Performance Mode</h2>
+
+        <div class="implementations">
+            <a href="simd/" class="implementation-card simd-card">
+                <div class="card-icon">🚀</div>
+                <div class="card-title">WASM+SIMD</div>
+                <div class="card-subtitle">Maximum Performance</div>
+                <ul class="card-features">
+                    <li>Fastest processing (30-100ms)</li>
+                    <li>WebAssembly with SIMD optimizations</li>
+                    <li>Best for production applications</li>
+                    <li>Requires modern browser</li>
+                </ul>
+                <div class="card-button">🔬 Launch WASM+SIMD Demo</div>
+            </a>
+
+            <a href="non-simd/" class="implementation-card wasm-card">
+                <div class="card-icon">⚡</div>
+                <div class="card-title">WASM (no SIMD)</div>
+                <div class="card-subtitle">Balanced Performance</div>
+                <ul class="card-features">
+                    <li>Good processing speed (60-200ms)</li>
+                    <li>WebAssembly without SIMD</li>
+                    <li>Works in most modern browsers</li>
+                    <li>Recommended for general use</li>
+                </ul>
+                <div class="card-button">⚡ Launch WASM Demo</div>
+            </a>
+
+            <a href="pure-js/" class="implementation-card js-card">
+                <div class="card-icon">📝</div>
+                <div class="card-title">Pure JavaScript</div>
+                <div class="card-subtitle">Universal Compatibility</div>
+                <ul class="card-features">
+                    <li>Reliable processing (100-500ms)</li>
+                    <li>No WebAssembly required</li>
+                    <li>Works in any ES6+ browser</li>
+                    <li>Maximum compatibility</li>
+                </ul>
+                <div class="card-button">📝 Launch JavaScript Demo</div>
+            </a>
+        </div>
+
+        <div class="requirements">
+            <h3>🔧 Browser Requirements</h3>
+            <p><strong>WASM+SIMD:</strong> Chrome 91+, Firefox 89+, Edge 91+</p>
+            <p><strong>WASM:</strong> Chrome 57+, Firefox 52+, Safari 11+, Edge 16+</p>
+            <p><strong>Pure JavaScript:</strong> Any modern browser with ES6+ support</p>
+            <p><strong>Audio Support:</strong> Web Audio API (supported in all modern browsers)</p>
+        </div>
+
+        <div style="background: #f8f9fa; padding: 25px; border-radius: 10px; margin: 30px 0;">
+            <h3 style="margin-top: 0; color: #2c3e50;">🎵 Sample Audio Files Included</h3>
+            <p>Each demo includes pre-loaded test files recorded at known speeds:</p>
+            <ul style="columns: 2; column-gap: 30px;">
+                <li>23 mph vehicle pass</li>
+                <li>28 mph vehicle pass</li>
+                <li>30 mph vehicle pass (2 recordings)</li>
+                <li>33 mph vehicle pass</li>
+                <li>37 mph vehicle pass</li>
+            </ul>
+            <p><em>You can also upload your own audio recordings to test!</em></p>
+        </div>
+
+        <div class="footer">
+            <p>
+                🔗 <a href="https://github.com/paul-hammant/Car-Speed-Via-Doppler-Library">View Source on GitHub</a> |
+                📚 <a href="API.md">API Documentation</a> | 
+                🏗️ <a href="ARCHITECTURE.md">Architecture Details</a>
+            </p>
+            <p>
+                Built with ❤️ using Web Audio API, WebAssembly, and the Doppler effect<br>
+                <small>Licensed under MIT • Educational and experimental use only</small>
+            </p>
+        </div>
+    </div>
+</body>
+</html>

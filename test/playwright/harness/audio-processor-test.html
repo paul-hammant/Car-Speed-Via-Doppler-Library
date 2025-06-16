@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AudioProcessor Browser Test Harness</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        #results { background: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .pass { color: green; }
+        .fail { color: red; }
+    </style>
+</head>
+<body>
+    <h1>🎵 AudioProcessor Browser Test Harness</h1>
+    <div id="results">Loading test harness...</div>
+
+    <script type="module">
+        import AudioProcessor from '../../../docs/shared/audio-utils.js';
+
+        // Test audio data generators
+        function generateTestAudioBuffer(sampleRate = 44100, duration = 1.0, frequency = 440) {
+            const totalSamples = Math.floor(sampleRate * duration);
+            const samples = new Float32Array(totalSamples);
+            
+            for (let i = 0; i < totalSamples; i++) {
+                const time = i / sampleRate;
+                samples[i] = Math.sin(2 * Math.PI * frequency * time);
+            }
+            
+            return { samples, sampleRate, duration, frequency };
+        }
+
+        function generateStereoTestBuffer(sampleRate = 44100, duration = 1.0) {
+            const totalSamples = Math.floor(sampleRate * duration);
+            const leftChannel = new Float32Array(totalSamples);
+            const rightChannel = new Float32Array(totalSamples);
+            
+            for (let i = 0; i < totalSamples; i++) {
+                const time = i / sampleRate;
+                leftChannel[i] = Math.sin(2 * Math.PI * 440 * time);   // A4 in left
+                rightChannel[i] = Math.sin(2 * Math.PI * 880 * time);  // A5 in right
+            }
+            
+            return { leftChannel, rightChannel, sampleRate, duration };
+        }
+
+        async function createWebAudioBuffer(sampleRate = 44100, duration = 1.0, frequency = 440) {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const totalSamples = Math.floor(sampleRate * duration);
+            const audioBuffer = audioContext.createBuffer(1, totalSamples, sampleRate);
+            
+            const channelData = audioBuffer.getChannelData(0);
+            for (let i = 0; i < totalSamples; i++) {
+                const time = i / sampleRate;
+                channelData[i] = Math.sin(2 * Math.PI * frequency * time);
+            }
+            
+            return audioBuffer;
+        }
+
+        // Main test functions accessible to Playwright
+        window.testAudioDecoding = async function() {
+            try {
+                const audioBuffer = await createWebAudioBuffer(44100, 1.0, 1000);
+                const startTime = performance.now();
+                const result = AudioProcessor.decodeAudioBuffer(audioBuffer);
+                const processingTime = performance.now() - startTime;
+                
+                const expectedSamples = Math.floor(44100 * 1.0);
+                const sampleCountCorrect = Math.abs(result.samples.length - expectedSamples) < 100;
+                const sampleRateCorrect = result.sampleRate === 44100;
+                
+                // Check if samples contain expected frequency content
+                const maxAmplitude = Math.max(...result.samples.map(Math.abs));
+                const amplitudeCorrect = maxAmplitude > 0.5 && maxAmplitude <= 1.1;
+                
+                return {
+                    expectedSamples,
+                    actualSamples: result.samples.length,
+                    expectedSampleRate: 44100,
+                    actualSampleRate: result.sampleRate,
+                    maxAmplitude: maxAmplitude.toFixed(3),
+                    sampleCountCorrect,
+                    sampleRateCorrect,
+                    amplitudeCorrect,
+                    processingTime: processingTime.toFixed(2),
+                    success: sampleCountCorrect && sampleRateCorrect && amplitudeCorrect
+                };
+                
+            } catch (err) {
+                return {
+                    success: false,
+                    error: err.message,
+                    processingTime: 0
+                };
+            }
+        };
+
+        window.testNormalization = async function() {
+            try {
+                // Test with various amplitude levels
+                const testCases = [
+                    { amplitude: 0.1, description: 'Quiet signal' },
+                    { amplitude: 0.5, description: 'Medium signal' },
+                    { amplitude: 2.0, description: 'Loud signal' },
+                    { amplitude: 10.0, description: 'Very loud signal' }
+                ];
+                
+                const results = [];
+                
+                for (const testCase of testCases) {
+                    const { samples } = generateTestAudioBuffer(8000, 0.5, 1000);
+                    
+                    // Scale to test amplitude
+                    const scaledSamples = samples.map(s => s * testCase.amplitude);
+                    
+                    const startTime = performance.now();
+                    const normalized = AudioProcessor.normalizeAmplitude(scaledSamples);
+                    const processingTime = performance.now() - startTime;
+                    
+                    const maxAmplitude = Math.max(...normalized.map(Math.abs));
+                    const rmsOriginal = Math.sqrt(scaledSamples.reduce((sum, s) => sum + s * s, 0) / scaledSamples.length);
+                    const rmsNormalized = Math.sqrt(normalized.reduce((sum, s) => sum + s * s, 0) / normalized.length);
+                    
+                    const success = maxAmplitude <= 1.01 && maxAmplitude >= 0.99; // Should normalize to ~1.0
+                    
+                    results.push({
+                        description: testCase.description,
+                        originalAmplitude: testCase.amplitude,
+                        maxNormalizedAmplitude: maxAmplitude.toFixed(3),
+                        rmsOriginal: rmsOriginal.toFixed(3),
+                        rmsNormalized: rmsNormalized.toFixed(3),
+                        processingTime: processingTime.toFixed(2),
+                        success
+                    });
+                }
+                
+                return {
+                    totalTests: results.length,
+                    passed: results.filter(r => r.success).length,
+                    failed: results.filter(r => !r.success).length,
+                    results
+                };
+                
+            } catch (err) {
+                return {
+                    success: false,
+                    error: err.message,
+                    results: []
+                };
+            }
+        };
+
+        window.testStereoToMono = async function() {
+            try {
+                const { leftChannel, rightChannel, sampleRate } = generateStereoTestBuffer(8000, 0.5);
+                
+                const startTime = performance.now();
+                const mono = AudioProcessor.stereoToMono(leftChannel, rightChannel);
+                const processingTime = performance.now() - startTime;
+                
+                const expectedLength = leftChannel.length;
+                const lengthCorrect = mono.length === expectedLength;
+                
+                // Check if mono is average of left and right
+                let averageCorrect = true;
+                for (let i = 0; i < Math.min(100, mono.length); i++) {
+                    const expectedValue = (leftChannel[i] + rightChannel[i]) / 2;
+                    const actualValue = mono[i];
+                    if (Math.abs(expectedValue - actualValue) > 0.001) {
+                        averageCorrect = false;
+                        break;
+                    }
+                }
+                
+                return {
+                    expectedLength,
+                    actualLength: mono.length,
+                    lengthCorrect,
+                    averageCorrect,
+                    processingTime: processingTime.toFixed(2),
+                    success: lengthCorrect && averageCorrect
+                };
+                
+            } catch (err) {
+                return {
+                    success: false,
+                    error: err.message,
+                    processingTime: 0
+                };
+            }
+        };
+
+        window.testResample = async function() {
+            try {
+                const { samples } = generateTestAudioBuffer(44100, 0.5, 1000);
+                const originalSampleRate = 44100;
+                const targetSampleRate = 22050;
+                
+                const startTime = performance.now();
+                const resampled = AudioProcessor.resample(samples, originalSampleRate, targetSampleRate);
+                const processingTime = performance.now() - startTime;
+                
+                const expectedLength = Math.floor(samples.length * targetSampleRate / originalSampleRate);
+                const lengthCorrect = Math.abs(resampled.length - expectedLength) < 10; // Allow small tolerance
+                
+                // Check if amplitude is preserved approximately
+                const originalRMS = Math.sqrt(samples.reduce((sum, s) => sum + s * s, 0) / samples.length);
+                const resampledRMS = Math.sqrt(resampled.reduce((sum, s) => sum + s * s, 0) / resampled.length);
+                const amplitudePreserved = Math.abs(originalRMS - resampledRMS) < 0.1;
+                
+                return {
+                    originalLength: samples.length,
+                    expectedLength,
+                    actualLength: resampled.length,
+                    originalSampleRate,
+                    targetSampleRate,
+                    originalRMS: originalRMS.toFixed(3),
+                    resampledRMS: resampledRMS.toFixed(3),
+                    lengthCorrect,
+                    amplitudePreserved,
+                    processingTime: processingTime.toFixed(2),
+                    success: lengthCorrect && amplitudePreserved
+                };
+                
+            } catch (err) {
+                return {
+                    success: false,
+                    error: err.message,
+                    processingTime: 0
+                };
+            }
+        };
+
+        window.testWithRealAudioFile = async function(audioFilePath = '/docs/shared/30_mph.wav') {
+            try {
+                // Load real audio file
+                const response = await fetch(audioFilePath);
+                if (!response.ok) {
+                    throw new Error(`Failed to load audio file: ${response.status}`);
+                }
+                
+                const arrayBuffer = await response.arrayBuffer();
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                
+                const startTime = performance.now();
+                
+                // Test decoding
+                const decoded = AudioProcessor.decodeAudioBuffer(audioBuffer);
+                
+                // Test normalization
+                const normalized = AudioProcessor.normalizeAmplitude(decoded.samples);
+                
+                // Test resampling to 8kHz (common for Doppler analysis)
+                const resampled = AudioProcessor.resample(decoded.samples, decoded.sampleRate, 8000);
+                
+                const processingTime = performance.now() - startTime;
+                
+                const maxNormalized = Math.max(...normalized.map(Math.abs));
+                const resampleRatio = resampled.length / decoded.samples.length;
+                const expectedRatio = 8000 / decoded.sampleRate;
+                
+                return {
+                    audioFile: audioFilePath,
+                    originalSampleRate: decoded.sampleRate,
+                    originalLength: decoded.samples.length,
+                    duration: (decoded.samples.length / decoded.sampleRate).toFixed(2),
+                    maxAmplitudeAfterNorm: maxNormalized.toFixed(3),
+                    resampledLength: resampled.length,
+                    resampleRatio: resampleRatio.toFixed(3),
+                    expectedRatio: expectedRatio.toFixed(3),
+                    resampleAccurate: Math.abs(resampleRatio - expectedRatio) < 0.1,
+                    processingTime: processingTime.toFixed(2),
+                    success: maxNormalized <= 1.01 && Math.abs(resampleRatio - expectedRatio) < 0.1
+                };
+                
+            } catch (err) {
+                return {
+                    success: false,
+                    error: err.message,
+                    audioFile: audioFilePath,
+                    processingTime: 0
+                };
+            }
+        };
+
+        window.testPerformance = async function() {
+            try {
+                const largeSamples = generateTestAudioBuffer(44100, 10.0, 1000).samples; // 10 second audio
+                const iterations = 10;
+                
+                const tests = [
+                    { name: 'Normalization', func: () => AudioProcessor.normalizeAmplitude(largeSamples) },
+                    { name: 'Resample 44→22kHz', func: () => AudioProcessor.resample(largeSamples, 44100, 22050) },
+                    { name: 'Resample 44→8kHz', func: () => AudioProcessor.resample(largeSamples, 44100, 8000) }
+                ];
+                
+                const results = [];
+                
+                for (const test of tests) {
+                    const times = [];
+                    
+                    for (let i = 0; i < iterations; i++) {
+                        const startTime = performance.now();
+                        test.func();
+                        const endTime = performance.now();
+                        times.push(endTime - startTime);
+                    }
+                    
+                    const avgTime = times.reduce((a, b) => a + b, 0) / times.length;
+                    const minTime = Math.min(...times);
+                    const maxTime = Math.max(...times);
+                    
+                    results.push({
+                        testName: test.name,
+                        iterations,
+                        averageTime: avgTime.toFixed(2),
+                        minTime: minTime.toFixed(2),
+                        maxTime: maxTime.toFixed(2),
+                        samplesProcessed: largeSamples.length,
+                        samplesPerSecond: Math.round(largeSamples.length / (avgTime / 1000))
+                    });
+                }
+                
+                return {
+                    audioLength: `${(largeSamples.length / 44100).toFixed(1)}s`,
+                    totalSamples: largeSamples.length,
+                    results
+                };
+                
+            } catch (err) {
+                return {
+                    success: false,
+                    error: err.message,
+                    results: []
+                };
+            }
+        };
+
+        window.runAllAudioProcessorTests = async function() {
+            const startTime = performance.now();
+            
+            const decodingResult = await window.testAudioDecoding();
+            const normalizationResult = await window.testNormalization();
+            const stereoToMonoResult = await window.testStereoToMono();
+            const resampleResult = await window.testResample();
+            const realAudioResult = await window.testWithRealAudioFile();
+            const performanceResult = await window.testPerformance();
+            
+            const totalTime = performance.now() - startTime;
+            
+            const basicTests = [decodingResult, stereoToMonoResult, resampleResult, realAudioResult];
+            const totalBasicTests = basicTests.length;
+            const passedBasicTests = basicTests.filter(t => t.success).length;
+            const totalNormTests = normalizationResult.totalTests || 0;
+            const passedNormTests = normalizationResult.passed || 0;
+            
+            return {
+                summary: {
+                    totalTests: totalBasicTests + totalNormTests,
+                    totalPassed: passedBasicTests + passedNormTests,
+                    totalFailed: (totalBasicTests - passedBasicTests) + (totalNormTests - passedNormTests),
+                    successRate: (((passedBasicTests + passedNormTests) / (totalBasicTests + totalNormTests)) * 100).toFixed(1),
+                    totalTime: totalTime.toFixed(1)
+                },
+                audioDecoding: decodingResult,
+                normalization: normalizationResult,
+                stereoToMono: stereoToMonoResult,
+                resampling: resampleResult,
+                realAudioFile: realAudioResult,
+                performance: performanceResult
+            };
+        };
+
+        // Initialize and show ready status
+        document.getElementById('results').innerHTML = `
+            <h3>✅ Test Harness Ready</h3>
+            <p>Available test functions:</p>
+            <ul>
+                <li><code>testAudioDecoding()</code></li>
+                <li><code>testNormalization()</code></li>
+                <li><code>testStereoToMono()</code></li>
+                <li><code>testResample()</code></li>
+                <li><code>testWithRealAudioFile(audioFilePath)</code></li>
+                <li><code>testPerformance()</code></li>
+                <li><code>runAllAudioProcessorTests()</code></li>
+            </ul>
+            <p><strong>Note:</strong> Tests use Web Audio API for realistic browser audio processing validation.</p>
+        `;
+    </script>
+</body>
+</html>

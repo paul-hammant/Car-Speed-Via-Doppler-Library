@@ -1,0 +1,17 @@
+node_modules/
+.DS_Store
+*.log
+.env
+.vscode/
+.idea/
+
+# Build directories (keep the final artifacts)
+emsdk/
+pffft-wasm/
+
+# Playwright test outputs
+playwright-report/
+test-results/
+
+# Keep these committed for GitHub Pages deployment:
+# lib/dist/
