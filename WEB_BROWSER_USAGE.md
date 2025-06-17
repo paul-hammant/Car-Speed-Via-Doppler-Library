@@ -2,9 +2,11 @@
 
 This guide shows how to use the Doppler Speed Calculator library in web browsers with real-time microphone input, specifically for Safari on iOS 18.
 
+> **Note**: This guide covers microphone input specifically. For general web integration via runtime linkage, see [DOPPLER_SERVICE_INTEGRATION.md](DOPPLER_SERVICE_INTEGRATION.md).
+
 ## Overview
 
-The library works directly with raw audio sample arrays from the Web Audio API, eliminating the need for file system operations or WAV file creation.
+The library works directly with raw audio sample arrays from the Web Audio API using runtime linkage, eliminating the need for file system operations or WAV file creation.
 
 ## Basic Setup
 
@@ -61,35 +63,39 @@ processor.connect(audioContext.destination);
 ### 4. Analyze Speed
 
 ```javascript
-function analyzeSpeed() {
-    // Import the library (adjust path for your bundler)
-    const { DopplerSpeedCalculator, SpectrumAnalyzer } = require('car-speed-via-doppler');
+async function analyzeSpeed() {
+    // Runtime linkage via dynamic imports
+    const BASE_URL = 'https://paul-hammant.github.io/Car-Speed-Via-Doppler';
     
-    // Split audio into approach and recede sections
-    const midpoint = Math.floor(audioBuffer.length / 2);
-    const approachSection = audioBuffer.slice(0, midpoint);
-    const recedeSection = audioBuffer.slice(midpoint);
+    const AudioAnalyzer = (await import(`${BASE_URL}/shared/audio-analyzer.js`)).default;
+    const AudioProcessor = (await import(`${BASE_URL}/shared/audio-utils.js`)).default;
     
-    // Analyze approach frequency
-    const approachAnalyzer = new SpectrumAnalyzer(approachSection, actualSampleRate);
-    approachAnalyzer.calculatePowerSpectrum();
-    const approachFreq = approachAnalyzer.findPeakFrequency();
+    // Initialize analyzer
+    const analyzer = new AudioAnalyzer({
+        fftMode: 'wasm-no-simd',
+        windowType: 'hamming',
+        confidenceThreshold: 0.7
+    });
     
-    // Analyze recede frequency
-    const recedeAnalyzer = new SpectrumAnalyzer(recedeSection, actualSampleRate);
-    recedeAnalyzer.calculatePowerSpectrum();
-    const recedeFreq = recedeAnalyzer.findPeakFrequency();
+    // Normalize audio samples
+    const normalizedSamples = AudioProcessor.normalizeAmplitude(audioBuffer);
     
-    // Calculate vehicle speed
-    const calculator = new DopplerSpeedCalculator();
-    const result = calculator.calculateSpeedWithValidation(approachFreq, recedeFreq);
+    // Extract approach and recede sections
+    const sections = analyzer.extractSections(normalizedSamples, actualSampleRate, 'peak_rms_energy');
+    
+    // Analyze frequencies and calculate speed
+    const speedResult = await analyzer.findBestSpeedCalculation(
+        await analyzer.analyzeFrequencies(sections.approaching, actualSampleRate),
+        await analyzer.analyzeFrequencies(sections.receding, actualSampleRate)
+    );
     
     // Display results
-    if (result.valid) {
-        console.log(`Vehicle Speed: ${result.speedKMH.toFixed(1)} km/h (${result.speedMPH.toFixed(1)} mph)`);
-        console.log(`Frequency shift: ${result.frequencyShift.toFixed(1)} Hz`);
+    if (speedResult.valid) {
+        console.log(`Vehicle Speed: ${speedResult.speedMph.toFixed(1)} mph (${speedResult.speedKmh.toFixed(1)} km/h)`);
+        console.log(`Strategy: ${speedResult.strategy}`);
+        console.log(`Confidence: ${speedResult.confidence}`);
     } else {
-        console.log(`Analysis failed: ${result.error}`);
+        console.log(`Analysis failed: ${speedResult.error}`);
     }
 }
 ```
@@ -106,7 +112,6 @@ function analyzeSpeed() {
     <button id="startBtn">Start Recording</button>
     <div id="results"></div>
     
-    <script src="your-bundled-doppler-lib.js"></script>
     <script>
         let audioContext, processor, source, stream;
         let audioBuffer = [];
@@ -156,35 +161,42 @@ function analyzeSpeed() {
             }
         });
         
-        function analyzeSpeed() {
-            const { DopplerSpeedCalculator, SpectrumAnalyzer } = DopplerSpeedLib;
+        async function analyzeSpeed() {
+            // Runtime linkage via dynamic imports
+            const BASE_URL = 'https://paul-hammant.github.io/Car-Speed-Via-Doppler';
             
-            const midpoint = Math.floor(audioBuffer.length / 2);
-            const approachSection = audioBuffer.slice(0, midpoint);
-            const recedeSection = audioBuffer.slice(midpoint);
+            const AudioAnalyzer = (await import(`${BASE_URL}/shared/audio-analyzer.js`)).default;
+            const AudioProcessor = (await import(`${BASE_URL}/shared/audio-utils.js`)).default;
             
-            const approachAnalyzer = new SpectrumAnalyzer(approachSection, audioContext.sampleRate);
-            approachAnalyzer.calculatePowerSpectrum();
-            const approachFreq = approachAnalyzer.findPeakFrequency();
+            // Initialize analyzer
+            const analyzer = new AudioAnalyzer({
+                fftMode: 'wasm-no-simd',
+                windowType: 'hamming',
+                confidenceThreshold: 0.7
+            });
             
-            const recedeAnalyzer = new SpectrumAnalyzer(recedeSection, audioContext.sampleRate);
-            recedeAnalyzer.calculatePowerSpectrum();
-            const recedeFreq = recedeAnalyzer.findPeakFrequency();
+            // Normalize audio samples
+            const normalizedSamples = AudioProcessor.normalizeAmplitude(audioBuffer);
             
-            const calculator = new DopplerSpeedCalculator();
-            const result = calculator.calculateSpeedWithValidation(approachFreq, recedeFreq);
+            // Extract approach and recede sections
+            const sections = analyzer.extractSections(normalizedSamples, audioContext.sampleRate, 'peak_rms_energy');
+            
+            // Analyze frequencies and calculate speed
+            const speedResult = await analyzer.findBestSpeedCalculation(
+                await analyzer.analyzeFrequencies(sections.approaching, audioContext.sampleRate),
+                await analyzer.analyzeFrequencies(sections.receding, audioContext.sampleRate)
+            );
             
             const resultsDiv = document.getElementById('results');
-            if (result.valid) {
+            if (speedResult.valid) {
                 resultsDiv.innerHTML = `
                     <h3>Speed Analysis Results</h3>
-                    <p>Speed: ${result.speedKMH.toFixed(1)} km/h (${result.speedMPH.toFixed(1)} mph)</p>
-                    <p>Approach frequency: ${approachFreq.toFixed(1)} Hz</p>
-                    <p>Recede frequency: ${recedeFreq.toFixed(1)} Hz</p>
-                    <p>Frequency shift: ${result.frequencyShift.toFixed(1)} Hz</p>
+                    <p>Speed: ${speedResult.speedKmh.toFixed(1)} km/h (${speedResult.speedMph.toFixed(1)} mph)</p>
+                    <p>Strategy: ${speedResult.strategy}</p>
+                    <p>Confidence: ${speedResult.confidence}</p>
                 `;
             } else {
-                resultsDiv.innerHTML = `<p>Analysis failed: ${result.error}</p>`;
+                resultsDiv.innerHTML = `<p>Analysis failed: ${speedResult.error}</p>`;
             }
             
             document.getElementById('startBtn').textContent = 'Start Recording';
