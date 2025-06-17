@@ -1,4 +1,6 @@
 /**
+ * Copyright Paul Hammant 2025, see GPL3 LICENSE in this repo
+ *
  * Analysis of Extracted Problematic Recordings
  * Tests the three solo-car ~30mph recordings that resulted in E09 errors
  * Now converted from MP4 to WAV for full Doppler analysis

@@ -1,4 +1,6 @@
 /**
+ * Copyright Paul Hammant 2025, see GPL3 LICENSE in this repo
+ *
  * Test Suite for Problematic Recordings
  * Tests real-world recordings that resulted in E09 errors in the web app
  * These recordings help identify edge cases and algorithm limitations

@@ -1,4 +1,6 @@
 /**
+ * Copyright Paul Hammant 2025, see GPL3 LICENSE in this repo
+ *
  * Unit Tests for AudioProcessor (AudioUtils)
  * 
  * These tests show beginners how to:

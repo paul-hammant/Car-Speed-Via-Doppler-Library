@@ -1,3 +1,7 @@
+/**
+ * Copyright Paul Hammant 2025, see GPL3 LICENSE in this repo
+ */
+
 import { test, expect } from '@playwright/test';
 
 test.describe('Web Doppler Speed Analysis', () => {

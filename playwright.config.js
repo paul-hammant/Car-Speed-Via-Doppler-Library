@@ -1,3 +1,7 @@
+/**
+ * Copyright Paul Hammant 2025, see GPL3 LICENSE in this repo
+ */
+
 import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({

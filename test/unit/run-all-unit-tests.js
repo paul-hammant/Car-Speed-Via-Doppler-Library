@@ -1,4 +1,6 @@
 /**
+ * Copyright Paul Hammant 2025, see GPL3 LICENSE in this repo
+ *
  * Master Unit Test Runner
  * 
  * This demonstrates to beginners how to:

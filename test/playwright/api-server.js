@@ -1,3 +1,7 @@
+/**
+ * Copyright Paul Hammant 2025, see GPL3 LICENSE in this repo
+ */
+
 import express from 'express';
 import { spawn } from 'child_process';
 import path from 'path';

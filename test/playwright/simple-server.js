@@ -1,3 +1,7 @@
+/**
+ * Copyright Paul Hammant 2025, see GPL3 LICENSE in this repo
+ */
+
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';

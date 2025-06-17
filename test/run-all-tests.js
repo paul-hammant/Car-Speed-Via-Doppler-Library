@@ -1,4 +1,6 @@
 /**
+ * Copyright Paul Hammant 2025, see GPL3 LICENSE in this repo
+ *
  * Comprehensive Test Runner
  * Runs all integration and unit tests for the car-speed-via-doppler-analysis module
  */
