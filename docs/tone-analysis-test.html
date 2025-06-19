@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tone Analysis - New Audio Files</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .file-section {
+            border: 1px solid #ddd;
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .file-section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .results {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .status.loading {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+        }
+        .status.success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+        }
+        audio {
+            width: 100%;
+            margin: 10px 0;
+        }
+        .frequency-table {
+            margin: 10px 0;
+            border-collapse: collapse;
+            width: 100%;
+        }
+        .frequency-table th, .frequency-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        .frequency-table th {
+            background-color: #f2f2f2;
+        }
+        .audio-section {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 10px;
+            border-radius: 5px;
+            background-color: #fafafa;
+        }
+        .audio-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .time-scrubber {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        .time-input {
+            width: 80px;
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+        }
+        .spectrogram-canvas {
+            border: 1px solid #ddd;
+            margin: 10px 0;
+            background-color: white;
+        }
+        .freq-labels {
+            font-size: 11px;
+            color: #666;
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎵 Tone Analysis - New Audio Files</h1>
+        <p>Analyzing frequency characteristics of the two new known-speed audio clips:</p>
+        
+        <div class="file-section">
+            <h3>📁 known_20_mph_15degreesC_2.5meters.wav</h3>
+            <p><strong>Expected:</strong> 20 mph, 15°C, 2.5m distance</p>
+            <audio controls>
+                <source src="shared/known_20_mph_15degreesC_2.5meters.wav" type="audio/wav">
+                Your browser does not support the audio element.
+            </audio>
+            <br>
+            <button onclick="analyzeFile('known_20_mph_15degreesC_2.5meters.wav', 20)">🔍 Analyze 20mph File</button>
+            <div id="status-20" class="status" style="display: none;"></div>
+            <div id="audio-clips-20" style="display: none; margin: 10px 0;">
+                <h4>🎵 Isolated Audio Sections:</h4>
+                <div style="display: flex; gap: 20px;">
+                    <div class="audio-section" style="flex: 1;">
+                        <h5>🚗 Approach Section</h5>
+                        <div class="audio-controls">
+                            <audio id="approach-audio-20" controls style="width: 100%;"></audio>
+                            <div class="time-scrubber">
+                                <label>Stop at:</label>
+                                <input type="number" id="approach-stop-20" class="time-input" step="0.1" min="0" placeholder="3.0">
+                                <span>seconds</span>
+                                <button onclick="setStopTime('approach-audio-20', 'approach-stop-20')">Set</button>
+                            </div>
+                            <div class="freq-labels">Frequencies: <span id="approach-freq-20">-</span></div>
+                        </div>
+                        <canvas id="approach-volume-20" class="spectrogram-canvas" width="400" height="200"></canvas>
+                    </div>
+                    <div class="audio-section" style="flex: 1;">
+                        <h5>🚙 Recede Section</h5>
+                        <div class="audio-controls">
+                            <audio id="recede-audio-20" controls style="width: 100%;"></audio>
+                            <div class="time-scrubber">
+                                <label>Jump to:</label>
+                                <input type="number" id="recede-time-20" class="time-input" step="0.1" min="0" placeholder="0.0">
+                                <span>seconds</span>
+                                <button onclick="jumpToTime('recede-audio-20', 'recede-time-20')">Go</button>
+                            </div>
+                            <div class="freq-labels">Frequencies: <span id="recede-freq-20">-</span></div>
+                        </div>
+                        <canvas id="recede-volume-20" class="spectrogram-canvas" width="400" height="200"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div id="results-20" class="results" style="display: none;"></div>
+        </div>
+
+        <div class="file-section">
+            <h3>📁 known_30_mph_15degreesC_6meters.m4a</h3>
+            <p><strong>Expected:</strong> 30 mph, 15°C, 6m distance</p>
+            <audio controls>
+                <source src="shared/known_30_mph_15degreesC_6meters.m4a" type="audio/mp4">
+                Your browser does not support the audio element.
+            </audio>
+            <br>
+            <button onclick="analyzeFile('known_30_mph_15degreesC_6meters.m4a', 30)">🔍 Analyze 30mph File</button>
+            <div id="status-30" class="status" style="display: none;"></div>
+            <div id="audio-clips-30" style="display: none; margin: 10px 0;">
+                <h4>🎵 Isolated Audio Sections:</h4>
+                <div style="display: flex; gap: 20px;">
+                    <div class="audio-section" style="flex: 1;">
+                        <h5>🚗 Approach Section</h5>
+                        <div class="audio-controls">
+                            <audio id="approach-audio-30" controls style="width: 100%;"></audio>
+                            <div class="time-scrubber">
+                                <label>Stop at:</label>
+                                <input type="number" id="approach-stop-30" class="time-input" step="0.1" min="0" placeholder="2.5">
+                                <span>seconds</span>
+                                <button onclick="setStopTime('approach-audio-30', 'approach-stop-30')">Set</button>
+                            </div>
+                            <div class="freq-labels">Frequencies: <span id="approach-freq-30">-</span></div>
+                        </div>
+                        <canvas id="approach-volume-30" class="spectrogram-canvas" width="400" height="200"></canvas>
+                    </div>
+                    <div class="audio-section" style="flex: 1;">
+                        <h5>🚙 Recede Section</h5>
+                        <div class="audio-controls">
+                            <audio id="recede-audio-30" controls style="width: 100%;"></audio>
+                            <div class="time-scrubber">
+                                <label>Jump to:</label>
+                                <input type="number" id="recede-time-30" class="time-input" step="0.1" min="0" placeholder="0.0">
+                                <span>seconds</span>
+                                <button onclick="jumpToTime('recede-audio-30', 'recede-time-30')">Go</button>
+                            </div>
+                            <div class="freq-labels">Frequencies: <span id="recede-freq-30">-</span></div>
+                        </div>
+                        <canvas id="recede-volume-30" class="spectrogram-canvas" width="400" height="200"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div id="results-30" class="results" style="display: none;"></div>
+        </div>
+
+        <div class="file-section">
+            <h3>🔬 Comparative Analysis</h3>
+            <button onclick="runComparativeAnalysis()" id="compare-btn" disabled>📊 Compare Both Files</button>
+            <div id="comparative-results" class="results" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import AudioAnalyzer from './shared/audio-analyzer.js?v=tone-test';
+        import AudioProcessor from './shared/audio-utils.js';
+
+        let analyzer = new AudioAnalyzer({
+            fftMode: 'auto',
+            windowType: 'hamming',
+            confidenceThreshold: 0.3,
+            sectioningStrategy: 'auto'
+        });
+
+        let analysisResults = {};
+
+        // Load audio file from URL using Web Audio API
+        async function loadAudioFromUrl(url) {
+            const response = await fetch(url);
+            const arrayBuffer = await response.arrayBuffer();
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+            return AudioProcessor.decodeAudioBuffer(audioBuffer);
+        }
+
+        window.analyzeFile = async function(filename, expectedMph) {
+            const fileKey = filename.includes('20_mph') ? '20' : '30';
+            const statusDiv = document.getElementById(`status-${fileKey}`);
+            const resultsDiv = document.getElementById(`results-${fileKey}`);
+            
+            statusDiv.style.display = 'block';
+            statusDiv.className = 'status loading';
+            statusDiv.textContent = `🔄 Loading and analyzing ${filename}...`;
+            resultsDiv.style.display = 'none';
+
+            try {
+                console.log(`🎯 Starting analysis of ${filename}`);
+                
+                // Load audio file
+                const audioData = await loadAudioFromUrl(`shared/${filename}`);
+                console.log(`📊 Audio loaded: ${audioData.samples.length} samples at ${audioData.sampleRate}Hz (${(audioData.samples.length/audioData.sampleRate).toFixed(1)}s)`);
+                
+                // Perform comprehensive analysis
+                const startTime = performance.now();
+                const analysis = await analyzer.analyzeAudioForSpeed(
+                    audioData.samples, 
+                    audioData.sampleRate,
+                    {
+                        expectedSpeed: expectedMph,
+                        topFrequencyCount: 15,
+                        confidenceThreshold: 0.2
+                    }
+                );
+                const analysisTime = performance.now() - startTime;
+
+                // Store results for comparison
+                analysisResults[fileKey] = {
+                    filename,
+                    expectedMph,
+                    analysis,
+                    audioData,
+                    analysisTime
+                };
+
+                // Generate detailed report
+                const report = await generateDetailedReport(filename, expectedMph, analysis, audioData, analysisTime);
+                
+                statusDiv.className = 'status success';
+                statusDiv.textContent = `✅ Analysis complete for ${filename}`;
+                resultsDiv.style.display = 'block';
+                resultsDiv.textContent = report;
+
+                // Show audio clips
+                document.getElementById(`audio-clips-${fileKey}`).style.display = 'block';
+
+                // Enable comparison if both files analyzed
+                if (Object.keys(analysisResults).length === 2) {
+                    document.getElementById('compare-btn').disabled = false;
+                }
+
+            } catch (error) {
+                console.error(`❌ Analysis failed for ${filename}:`, error);
+                statusDiv.className = 'status error';
+                statusDiv.textContent = `❌ Analysis failed: ${error.message}`;
+                resultsDiv.style.display = 'block';
+                resultsDiv.textContent = `Error Details:\n${error.stack}`;
+            }
+        };
+
+        window.runComparativeAnalysis = function() {
+            const resultsDiv = document.getElementById('comparative-results');
+            
+            if (Object.keys(analysisResults).length < 2) {
+                resultsDiv.style.display = 'block';
+                resultsDiv.textContent = '❌ Please analyze both files first';
+                return;
+            }
+
+            const comparison = generateComparativeReport(analysisResults['20'], analysisResults['30']);
+            resultsDiv.style.display = 'block';
+            resultsDiv.textContent = comparison;
+        };
+
+        async function generateDetailedReport(filename, expectedMph, analysis, audioData, analysisTime) {
+            let report = `🎵 TONE ANALYSIS REPORT: ${filename}\n`;
+            report += `${'='.repeat(60)}\n\n`;
+            
+            // Basic audio info
+            report += `📊 AUDIO CHARACTERISTICS:\n`;
+            report += `   Duration: ${(audioData.samples.length / audioData.sampleRate).toFixed(2)}s\n`;
+            report += `   Sample Rate: ${audioData.sampleRate}Hz\n`;
+            report += `   Samples: ${audioData.samples.length.toLocaleString()}\n`;
+            report += `   Expected Speed: ${expectedMph} mph\n`;
+            report += `   Analysis Time: ${analysisTime.toFixed(1)}ms\n\n`;
+
+            // Add detailed frequency breakdown regardless of analysis success
+            try {
+                const freqBreakdown = await generateFrequencyBreakdown(audioData.samples, audioData.sampleRate);
+                report += freqBreakdown;
+            } catch (error) {
+                report += `⚠️ Frequency breakdown failed: ${error.message}\n\n`;
+            }
+
+            // Analysis success/failure
+            if (analysis.success) {
+                report += `✅ SPEED DETECTION: SUCCESS\n`;
+                report += `   Detected Speed: ${analysis.speedMPH?.toFixed(1)} mph (${analysis.speedKMH?.toFixed(1)} km/h)\n`;
+                report += `   Accuracy: ${expectedMph ? (100 - Math.abs(analysis.speedMPH - expectedMph)/expectedMph * 100).toFixed(1) : 'N/A'}%\n`;
+                report += `   Confidence: ${(analysis.confidence * 100).toFixed(1)}%\n`;
+                
+                if (analysis.frequencies) {
+                    report += `   Approach Freq: ${analysis.frequencies.approach.toFixed(1)}Hz\n`;
+                    report += `   Recede Freq: ${analysis.frequencies.recede.toFixed(1)}Hz\n`;
+                    report += `   Freq Separation: ${analysis.frequencies.separation.toFixed(1)}Hz\n`;
+                    report += `   Freq Ratio: ${analysis.frequencies.ratio.toFixed(3)}\n`;
+                }
+            } else {
+                report += `❌ SPEED DETECTION: FAILED\n`;
+                report += `   Error: ${analysis.error}\n`;
+                if (analysis.diagnostics) {
+                    report += `   Issues: ${analysis.diagnostics.issues.join(', ')}\n`;
+                    report += `   Recommendations: ${analysis.diagnostics.recommendations.join(', ')}\n`;
+                }
+            }
+            report += `\n`;
+
+            // Sectioning details
+            if (analysis.metadata?.sectioning) {
+                const sect = analysis.metadata.sectioning;
+                report += `📐 AUDIO SECTIONING:\n`;
+                report += `   Strategy: ${sect.strategy}\n`;
+                report += `   Approach Duration: ${sect.approachDuration?.toFixed(2)}s\n`;
+                report += `   Recede Duration: ${sect.recedeDuration?.toFixed(2)}s\n`;
+                report += `   Sectioning Valid: ${sect.validation?.isValid}\n`;
+                if (!sect.validation?.isValid) {
+                    report += `   Sectioning Errors: ${sect.validation?.errors?.join(', ')}\n`;
+                }
+                report += `\n`;
+            }
+
+            // Frequency analysis details
+            if (analysis.metadata?.frequencyAnalysis) {
+                const freq = analysis.metadata.frequencyAnalysis;
+                report += `🔊 FREQUENCY ANALYSIS:\n`;
+                report += `   Implementation: ${freq.implementation}\n`;
+                report += `   Approach Section:\n`;
+                report += `     Valid: ${freq.approach.valid}\n`;
+                report += `     Confidence: ${(freq.approach.confidence * 100).toFixed(1)}%\n`;
+                report += `     Peak Frequency: ${freq.approach.peakFrequency?.toFixed(1)}Hz\n`;
+                report += `     Frequency Count: ${freq.approach.frequencyCount}\n`;
+                report += `   Recede Section:\n`;
+                report += `     Valid: ${freq.recede.valid}\n`;
+                report += `     Confidence: ${(freq.recede.confidence * 100).toFixed(1)}%\n`;
+                report += `     Peak Frequency: ${freq.recede.peakFrequency?.toFixed(1)}Hz\n`;
+                report += `     Frequency Count: ${freq.recede.frequencyCount}\n`;
+                report += `\n`;
+            }
+
+            // Alternative results
+            if (analysis.alternatives && analysis.alternatives.length > 0) {
+                report += `🔄 ALTERNATIVE CALCULATIONS:\n`;
+                analysis.alternatives.forEach((alt, i) => {
+                    report += `   ${i+1}. ${alt.speed.toFixed(1)} mph (conf: ${(alt.confidence*100).toFixed(1)}%) - ${alt.approachFreq.toFixed(1)}Hz → ${alt.recedeFreq.toFixed(1)}Hz\n`;
+                });
+                report += `\n`;
+            }
+
+            // Strategy information
+            if (analysis.strategy) {
+                report += `🎯 STRATEGY DETAILS:\n`;
+                report += `   Selected: ${analysis.strategy}\n`;
+                if (analysis.strategyComparison) {
+                    report += `   Available Strategies: ${Object.keys(analysis.strategyComparison).join(', ')}\n`;
+                }
+                report += `\n`;
+            }
+
+            return report;
+        }
+
+        function generateComparativeReport(result20, result30) {
+            let report = `🔬 COMPARATIVE ANALYSIS\n`;
+            report += `${'='.repeat(60)}\n\n`;
+
+            report += `📊 SUMMARY COMPARISON:\n`;
+            report += `   20mph file: ${result20.analysis.success ? '✅ SUCCESS' : '❌ FAILED'}\n`;
+            report += `   30mph file: ${result30.analysis.success ? '✅ SUCCESS' : '❌ FAILED'}\n\n`;
+
+            if (result20.analysis.success && result30.analysis.success) {
+                report += `🎯 SPEED ACCURACY:\n`;
+                const acc20 = 100 - Math.abs(result20.analysis.speedMPH - 20)/20 * 100;
+                const acc30 = 100 - Math.abs(result30.analysis.speedMPH - 30)/30 * 100;
+                report += `   20mph: ${result20.analysis.speedMPH.toFixed(1)} mph (${acc20.toFixed(1)}% accuracy)\n`;
+                report += `   30mph: ${result30.analysis.speedMPH.toFixed(1)} mph (${acc30.toFixed(1)}% accuracy)\n\n`;
+
+                report += `🔊 FREQUENCY PATTERNS:\n`;
+                if (result20.analysis.frequencies && result30.analysis.frequencies) {
+                    report += `   20mph: ${result20.analysis.frequencies.approach.toFixed(1)}Hz → ${result20.analysis.frequencies.recede.toFixed(1)}Hz (${result20.analysis.frequencies.separation.toFixed(1)}Hz sep)\n`;
+                    report += `   30mph: ${result30.analysis.frequencies.approach.toFixed(1)}Hz → ${result30.analysis.frequencies.recede.toFixed(1)}Hz (${result30.analysis.frequencies.separation.toFixed(1)}Hz sep)\n\n`;
+                }
+
+                report += `📈 CONFIDENCE LEVELS:\n`;
+                report += `   20mph: ${(result20.analysis.confidence * 100).toFixed(1)}%\n`;
+                report += `   30mph: ${(result30.analysis.confidence * 100).toFixed(1)}%\n\n`;
+            }
+
+            report += `⏱️ PERFORMANCE:\n`;
+            report += `   20mph analysis: ${result20.analysisTime.toFixed(1)}ms\n`;
+            report += `   30mph analysis: ${result30.analysisTime.toFixed(1)}ms\n\n`;
+
+            report += `🔍 DISTANCE/TEMPERATURE FACTORS:\n`;
+            report += `   20mph file: 2.5m distance, 15°C\n`;
+            report += `   30mph file: 6.0m distance, 15°C\n`;
+            report += `   Distance ratio: 2.4x (may affect signal strength)\n`;
+            report += `   Temperature: Same (15°C) - no compensation needed\n\n`;
+
+            // Analysis insights
+            report += `💡 INSIGHTS:\n`;
+            if (result20.analysis.success && result30.analysis.success) {
+                const speedRatio = result30.analysis.speedMPH / result20.analysis.speedMPH;
+                const expectedRatio = 30 / 20; // 1.5
+                report += `   Speed ratio detected: ${speedRatio.toFixed(2)} (expected: ${expectedRatio})\n`;
+                
+                if (Math.abs(speedRatio - expectedRatio) < 0.2) {
+                    report += `   ✅ Good proportional detection\n`;
+                } else {
+                    report += `   ⚠️ Speed ratio inconsistency detected\n`;
+                }
+            }
+
+            return report;
+        }
+
+        // Generate detailed frequency breakdown with sectioning info
+        async function generateFrequencyBreakdown(samples, sampleRate) {
+            let report = `🔊 DETAILED FREQUENCY BREAKDOWN:\n`;
+            
+            // Calculate sectioning info
+            const duration = samples.length / sampleRate;
+            
+            // Find closest approach using energy analysis
+            const closestApproachIndex = findClosestApproach(samples);
+            const closestApproachTime = closestApproachIndex / sampleRate;
+            
+            // Your improved sectioning strategy - lose ~1 second around peak RMS
+            const bufferMs = 500; // 500ms buffer each side = ~1 second total gap
+            const bufferSamples = Math.floor(bufferMs * sampleRate / 1000);
+            
+            // Define approach and recede sections with buffer around closest approach
+            const approachStart = 0;
+            const approachEnd = Math.max(0, closestApproachIndex - bufferSamples);
+            const recedeStart = Math.min(samples.length, closestApproachIndex + bufferSamples);
+            const recedeEnd = samples.length;
+            
+            const approachDuration = (approachEnd - approachStart) / sampleRate;
+            const recedeDuration = (recedeEnd - recedeStart) / sampleRate;
+            
+            report += `📐 IMPROVED SECTIONING ANALYSIS:\n`;
+            report += `   Total Duration: ${duration.toFixed(2)}s\n`;
+            report += `   Closest Approach: ${closestApproachTime.toFixed(2)}s\n`;
+            report += `   Buffer: ${bufferMs}ms each side (${bufferSamples} samples, ~${(bufferMs*2/1000).toFixed(1)}s total gap)\n`;
+            report += `   Approach Section: 0.00s - ${(approachEnd/sampleRate).toFixed(2)}s (${approachDuration.toFixed(2)}s)\n`;
+            report += `   Recede Section: ${(recedeStart/sampleRate).toFixed(2)}s - ${duration.toFixed(2)}s (${recedeDuration.toFixed(2)}s)\n\n`;
+            
+            // Compare with old quarters method
+            const quarterLength = Math.floor(samples.length / 4);
+            report += `📊 COMPARISON WITH QUARTERS METHOD:\n`;
+            report += `   OLD: First quarter: 0.00s - ${(quarterLength/sampleRate).toFixed(2)}s\n`;
+            report += `   OLD: Last quarter: ${((samples.length - quarterLength)/sampleRate).toFixed(2)}s - ${duration.toFixed(2)}s\n`;
+            report += `   NEW: Approach: 0.00s - ${(approachEnd/sampleRate).toFixed(2)}s (${(approachDuration/((quarterLength/sampleRate))).toFixed(1)}x longer)\n`;
+            report += `   NEW: Recede: ${(recedeStart/sampleRate).toFixed(2)}s - ${duration.toFixed(2)}s (${(recedeDuration/((quarterLength/sampleRate))).toFixed(1)}x longer)\n\n`;
+
+            // Extract approach and recede sections
+            const approachSamples = samples.slice(approachStart, approachEnd);
+            const recedeSamples = samples.slice(recedeStart, recedeEnd);
+            
+            // Create audio clips for isolated playback
+            await createAudioClips(approachSamples, recedeSamples, sampleRate);
+            
+            // Generate volume-over-time charts
+            await generateVolumeCharts(approachSamples, recedeSamples, sampleRate, closestApproachTime);
+            
+            report += `🎵 ISOLATED AUDIO CLIPS:\n`;
+            report += `   Approach clip: ${approachDuration.toFixed(2)}s duration\n`;
+            report += `   Recede clip: ${recedeDuration.toFixed(2)}s duration\n`;
+            report += `   ▶️ Use the audio players below to hear each section\n`;
+            report += `   📊 Volume charts show audio intensity over time\n`;
+            report += `   🛑 Approach: Set "stop at" time to avoid closest approach\n`;
+            report += `   ⏱️ Recede: Use "jump to" for precise moment analysis\n`;
+            report += `   🎯 Strategy: Lose ~1 second around peak RMS for cleaner frequency separation\n\n`;
+
+            // Analyze approach section with improved method
+            const approachFreqs = await analyzeFrequenciesSimple(approachSamples, sampleRate, 'IMPROVED APPROACH');
+            
+            // Analyze recede section with improved method
+            const recedeFreqs = await analyzeFrequenciesSimple(recedeSamples, sampleRate, 'IMPROVED RECEDE');
+            
+            // Analyze full spectrum for reference
+            const fullFreqs = await analyzeFrequenciesSimple(samples.slice(0, Math.min(samples.length, 88200)), sampleRate, 'FULL AUDIO');
+            
+            report += approachFreqs + recedeFreqs + fullFreqs;
+            
+            // Cross-frequency analysis with improved sectioning
+            report += `🔄 IMPROVED FREQUENCY MATCHING POTENTIAL:\n`;
+            const approachList = await getTopFrequencies(approachSamples, sampleRate, 10);
+            const recedeList = await getTopFrequencies(recedeSamples, sampleRate, 10);
+            
+            report += `   Top Approach Frequencies: ${approachList.map(f => f.frequency.toFixed(1)).join(', ')}Hz\n`;
+            report += `   Top Recede Frequencies: ${recedeList.map(f => f.frequency.toFixed(1)).join(', ')}Hz\n`;
+            
+            // Find potential Doppler pairs
+            let pairCount = 0;
+            for (let i = 0; i < Math.min(5, approachList.length); i++) {
+                for (let j = 0; j < Math.min(5, recedeList.length); j++) {
+                    const af = approachList[i].frequency;
+                    const rf = recedeList[j].frequency;
+                    const ratio = Math.abs(af - rf) / Math.max(af, rf);
+                    if (ratio > 0.005 && ratio < 0.5) { // 0.5% to 50% difference
+                        const dopplerCalculator = new (await import('./shared/doppler-calculator-v2.js')).default();
+                        const speed = dopplerCalculator.calculateSpeed(af, rf);
+                        if (speed > 0) {
+                            report += `   Potential Pair: ${af.toFixed(1)}Hz → ${rf.toFixed(1)}Hz = ${speed.toFixed(1)} km/h (${(speed * 0.621371).toFixed(1)} mph)\n`;
+                            pairCount++;
+                        }
+                    }
+                }
+            }
+            
+            if (pairCount === 0) {
+                report += `   ❌ No viable Doppler frequency pairs found\n`;
+            }
+            report += `\n`;
+            
+            return report;
+        }
+
+        // Simple frequency analysis without stack overflow
+        async function analyzeFrequenciesSimple(samples, sampleRate, sectionName) {
+            let report = `📊 ${sectionName} SECTION (${(samples.length/sampleRate).toFixed(2)}s):\n`;
+            
+            try {
+                const freqs = await getTopFrequencies(samples, sampleRate, 8);
+                const maxPower = Math.max(...freqs.map(f => f.power));
+                
+                report += `   Peak Frequency: ${freqs[0]?.frequency.toFixed(1)}Hz (${freqs[0]?.power.toExponential(2)})\n`;
+                report += `   RMS Power: ${Math.sqrt(freqs.reduce((sum, f) => sum + f.power * f.power, 0) / freqs.length).toExponential(2)}\n`;
+                report += `   Top Frequencies:\n`;
+                
+                freqs.forEach((freq, i) => {
+                    const relPower = (freq.power / maxPower * 100).toFixed(1);
+                    report += `     ${i+1}. ${freq.frequency.toFixed(1)}Hz (${relPower}% rel power)\n`;
+                });
+                
+            } catch (error) {
+                report += `   ❌ Analysis failed: ${error.message}\n`;
+            }
+            
+            report += `\n`;
+            return report;
+        }
+
+        // Create audio clips for approach and recede sections
+        async function createAudioClips(approachSamples, recedeSamples, sampleRate) {
+            try {
+                // Create AudioContext
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                
+                // Create approach audio buffer
+                const approachBuffer = audioContext.createBuffer(1, approachSamples.length, sampleRate);
+                const approachChannelData = approachBuffer.getChannelData(0);
+                for (let i = 0; i < approachSamples.length; i++) {
+                    approachChannelData[i] = approachSamples[i];
+                }
+                
+                // Create recede audio buffer
+                const recedeBuffer = audioContext.createBuffer(1, recedeSamples.length, sampleRate);
+                const recedeChannelData = recedeBuffer.getChannelData(0);
+                for (let i = 0; i < recedeSamples.length; i++) {
+                    recedeChannelData[i] = recedeSamples[i];
+                }
+                
+                // Convert to WAV blobs and create URLs
+                const approachBlob = await audioBufferToWav(approachBuffer);
+                const recedeBlob = await audioBufferToWav(recedeBuffer);
+                
+                const approachUrl = URL.createObjectURL(approachBlob);
+                const recedeUrl = URL.createObjectURL(recedeBlob);
+                
+                // Determine which file we're working with
+                const currentAnalysis = analysisResults[Object.keys(analysisResults).pop()];
+                const fileKey = currentAnalysis?.filename?.includes('20_mph') ? '20' : '30';
+                
+                // Set audio sources
+                const approachAudio = document.getElementById(`approach-audio-${fileKey}`);
+                const recedeAudio = document.getElementById(`recede-audio-${fileKey}`);
+                
+                if (approachAudio && recedeAudio) {
+                    approachAudio.src = approachUrl;
+                    recedeAudio.src = recedeUrl;
+                    
+                    // Auto-suggest a good stop time for approach (80% of duration)
+                    approachAudio.addEventListener('loadedmetadata', () => {
+                        const suggestedStopTime = Math.max(0.5, approachAudio.duration * 0.8);
+                        const stopInput = document.getElementById(`approach-stop-${fileKey}`);
+                        if (stopInput && !stopInput.value) {
+                            stopInput.placeholder = suggestedStopTime.toFixed(1);
+                        }
+                    });
+                    
+                    // Clean up previous URLs to prevent memory leaks
+                    approachAudio.addEventListener('loadstart', () => {
+                        if (approachAudio.dataset.oldUrl) {
+                            URL.revokeObjectURL(approachAudio.dataset.oldUrl);
+                        }
+                        approachAudio.dataset.oldUrl = approachUrl;
+                    });
+                    
+                    recedeAudio.addEventListener('loadstart', () => {
+                        if (recedeAudio.dataset.oldUrl) {
+                            URL.revokeObjectURL(recedeAudio.dataset.oldUrl);
+                        }
+                        recedeAudio.dataset.oldUrl = recedeUrl;
+                    });
+                }
+                
+            } catch (error) {
+                console.error('Failed to create audio clips:', error);
+            }
+        }
+
+        // Convert AudioBuffer to WAV blob
+        async function audioBufferToWav(audioBuffer) {
+            const length = audioBuffer.length;
+            const sampleRate = audioBuffer.sampleRate;
+            const channelData = audioBuffer.getChannelData(0);
+            
+            // WAV file header
+            const arrayBuffer = new ArrayBuffer(44 + length * 2);
+            const view = new DataView(arrayBuffer);
+            
+            const writeString = (offset, string) => {
+                for (let i = 0; i < string.length; i++) {
+                    view.setUint8(offset + i, string.charCodeAt(i));
+                }
+            };
+            
+            // WAV header
+            writeString(0, 'RIFF');
+            view.setUint32(4, 36 + length * 2, true);
+            writeString(8, 'WAVE');
+            writeString(12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true);
+            view.setUint16(22, 1, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * 2, true);
+            view.setUint16(32, 2, true);
+            view.setUint16(34, 16, true);
+            writeString(36, 'data');
+            view.setUint32(40, length * 2, true);
+            
+            // Convert samples to 16-bit PCM
+            let offset = 44;
+            for (let i = 0; i < length; i++) {
+                const sample = Math.max(-1, Math.min(1, channelData[i]));
+                view.setInt16(offset, sample * 0x7FFF, true);
+                offset += 2;
+            }
+            
+            return new Blob([arrayBuffer], { type: 'audio/wav' });
+        }
+
+        // Find closest approach using RMS energy analysis
+        function findClosestApproach(samples) {
+            const windowSize = Math.floor(samples.length / 20); // 5% windows
+            const step = Math.floor(windowSize / 4); // 75% overlap
+            let maxEnergy = 0;
+            let maxIndex = Math.floor(samples.length / 2); // Default to middle
+            
+            for (let i = 0; i < samples.length - windowSize; i += step) {
+                let energy = 0;
+                for (let j = i; j < i + windowSize; j++) {
+                    energy += samples[j] * samples[j];
+                }
+                
+                if (energy > maxEnergy) {
+                    maxEnergy = energy;
+                    maxIndex = i + Math.floor(windowSize / 2);
+                }
+            }
+            
+            return maxIndex;
+        }
+
+        // Get top frequencies using simple DFT to avoid stack overflow
+        async function getTopFrequencies(samples, sampleRate, count = 10) {
+            const maxSamples = Math.min(samples.length, 16384); // Limit to prevent overflow
+            const workingSamples = samples.slice(0, maxSamples);
+            const freqStep = sampleRate / maxSamples;
+            const frequencies = [];
+            
+            // Test frequency range from 50Hz to 20kHz with coarse resolution
+            for (let freq = 50; freq <= Math.min(20000, sampleRate/2); freq += Math.max(1, freqStep * 4)) {
+                let real = 0, imag = 0;
+                const omega = 2 * Math.PI * freq / sampleRate;
+                
+                // Simple DFT calculation for this frequency
+                for (let i = 0; i < workingSamples.length; i += 8) { // Subsample to speed up
+                    const phase = omega * i;
+                    real += workingSamples[i] * Math.cos(phase);
+                    imag += workingSamples[i] * Math.sin(phase);
+                }
+                
+                const power = Math.sqrt(real * real + imag * imag) / workingSamples.length;
+                if (power > 1e-6) { // Only keep significant frequencies
+                    frequencies.push({ frequency: freq, power });
+                }
+            }
+            
+            return frequencies
+                .sort((a, b) => b.power - a.power)
+                .slice(0, count);
+        }
+
+        // Jump to specific time with 0.1s precision (for recede sections)
+        window.jumpToTime = function(audioId, inputId) {
+            const audio = document.getElementById(audioId);
+            const timeInput = document.getElementById(inputId);
+            const targetTime = parseFloat(timeInput.value);
+            
+            if (!isNaN(targetTime) && targetTime >= 0 && targetTime <= audio.duration) {
+                audio.currentTime = targetTime;
+                audio.focus();
+            } else {
+                alert(`Time must be between 0 and ${audio.duration?.toFixed(1)} seconds`);
+            }
+        };
+
+        // Set stop time for approach sections
+        window.setStopTime = function(audioId, inputId) {
+            const audio = document.getElementById(audioId);
+            const timeInput = document.getElementById(inputId);
+            const stopTime = parseFloat(timeInput.value);
+            
+            if (!isNaN(stopTime) && stopTime >= 0 && stopTime <= audio.duration) {
+                // Store stop time on the audio element
+                audio.dataset.stopTime = stopTime;
+                
+                // Add time update listener if not already present
+                if (!audio.dataset.stopListenerAdded) {
+                    audio.addEventListener('timeupdate', function() {
+                        const currentStopTime = parseFloat(this.dataset.stopTime);
+                        if (!isNaN(currentStopTime) && this.currentTime >= currentStopTime) {
+                            this.pause();
+                            this.style.border = '2px solid orange';
+                            setTimeout(() => {
+                                this.style.border = '';
+                            }, 1000);
+                        }
+                    });
+                    audio.dataset.stopListenerAdded = 'true';
+                }
+                
+                // Visual feedback
+                timeInput.style.backgroundColor = '#d4edda';
+                setTimeout(() => {
+                    timeInput.style.backgroundColor = '';
+                }, 1000);
+                
+            } else {
+                alert(`Stop time must be between 0 and ${audio.duration?.toFixed(1)} seconds`);
+            }
+        };
+
+        // Generate volume-over-time charts for approach and recede sections
+        async function generateVolumeCharts(approachSamples, recedeSamples, sampleRate, closestApproachTime) {
+            try {
+                // Determine which file we're working with
+                const currentAnalysis = analysisResults[Object.keys(analysisResults).pop()];
+                const fileKey = currentAnalysis?.filename?.includes('20_mph') ? '20' : '30';
+                
+                // Generate approach volume chart
+                const approachCanvas = document.getElementById(`approach-volume-${fileKey}`);
+                if (approachCanvas) {
+                    await drawVolumeChart(approachCanvas, approachSamples, sampleRate, 'Approach');
+                    updateFrequencyDisplay(`approach-freq-${fileKey}`, approachSamples, sampleRate);
+                }
+                
+                // Generate recede volume chart
+                const recedeCanvas = document.getElementById(`recede-volume-${fileKey}`);
+                if (recedeCanvas) {
+                    await drawVolumeChart(recedeCanvas, recedeSamples, sampleRate, 'Recede');
+                    updateFrequencyDisplay(`recede-freq-${fileKey}`, recedeSamples, sampleRate);
+                }
+                
+            } catch (error) {
+                console.error('Failed to generate volume charts:', error);
+            }
+        }
+
+        // Draw volume-over-time chart on canvas
+        async function drawVolumeChart(canvas, samples, sampleRate, title) {
+            const ctx = canvas.getContext('2d');
+            const width = canvas.width;
+            const height = canvas.height;
+            
+            // Clear canvas
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, width, height);
+            
+            // Volume calculation parameters
+            const windowSize = Math.floor(sampleRate * 0.01); // 10ms windows
+            const numWindows = Math.floor(samples.length / windowSize);
+            const volumes = [];
+            
+            // Calculate RMS volume for each window
+            for (let i = 0; i < numWindows; i++) {
+                const startIdx = i * windowSize;
+                const endIdx = Math.min(startIdx + windowSize, samples.length);
+                
+                let sum = 0;
+                for (let j = startIdx; j < endIdx; j++) {
+                    sum += samples[j] * samples[j];
+                }
+                const rms = Math.sqrt(sum / (endIdx - startIdx));
+                volumes.push(rms);
+            }
+            
+            // Find max volume for normalization
+            const maxVolume = Math.max(...volumes, 1e-10);
+            
+            // Draw background grid
+            ctx.strokeStyle = '#f0f0f0';
+            ctx.lineWidth = 1;
+            for (let i = 1; i < 5; i++) {
+                const y = (i * height) / 5;
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(width, y);
+                ctx.stroke();
+            }
+            
+            // Draw volume curve
+            ctx.strokeStyle = title === 'Approach' ? '#2196F3' : '#FF9800';
+            ctx.fillStyle = title === 'Approach' ? 'rgba(33, 150, 243, 0.3)' : 'rgba(255, 152, 0, 0.3)';
+            ctx.lineWidth = 2;
+            
+            ctx.beginPath();
+            ctx.moveTo(0, height);
+            
+            for (let i = 0; i < volumes.length; i++) {
+                const x = (i / volumes.length) * width;
+                const normalizedVolume = volumes[i] / maxVolume;
+                const y = height - (normalizedVolume * height * 0.9); // 90% of height
+                
+                if (i === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            }
+            
+            // Fill area under curve
+            const lastX = ((volumes.length - 1) / volumes.length) * width;
+            ctx.lineTo(lastX, height);
+            ctx.lineTo(0, height);
+            ctx.closePath();
+            ctx.fill();
+            
+            // Draw outline
+            ctx.beginPath();
+            for (let i = 0; i < volumes.length; i++) {
+                const x = (i / volumes.length) * width;
+                const normalizedVolume = volumes[i] / maxVolume;
+                const y = height - (normalizedVolume * height * 0.9);
+                
+                if (i === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            }
+            ctx.stroke();
+            
+            // Add labels
+            ctx.fillStyle = 'black';
+            ctx.font = '12px Arial';
+            ctx.fillText(`${title} Volume Over Time`, 5, 15);
+            
+            // Add time labels
+            const duration = samples.length / sampleRate;
+            ctx.fillText('0s', 5, height - 5);
+            ctx.fillText(`${duration.toFixed(1)}s`, width - 30, height - 5);
+            
+            // Add volume labels
+            ctx.fillText('High', 5, 30);
+            ctx.fillText('Low', 5, height - 20);
+            
+            // Add peak indicator
+            const peakIdx = volumes.indexOf(Math.max(...volumes));
+            const peakTime = (peakIdx / volumes.length) * duration;
+            const peakX = (peakIdx / volumes.length) * width;
+            const peakY = height - (height * 0.9);
+            
+            // Draw peak marker
+            ctx.fillStyle = 'red';
+            ctx.beginPath();
+            ctx.arc(peakX, peakY, 4, 0, 2 * Math.PI);
+            ctx.fill();
+            
+            // Peak time label
+            ctx.fillStyle = 'red';
+            ctx.font = '10px Arial';
+            ctx.fillText(`Peak: ${peakTime.toFixed(1)}s`, peakX + 5, peakY - 5);
+        }
+
+        // Update frequency display for a section
+        async function updateFrequencyDisplay(elementId, samples, sampleRate) {
+            try {
+                const topFreqs = await getTopFrequencies(samples, sampleRate, 5);
+                const freqText = topFreqs.map(f => `${f.frequency.toFixed(0)}Hz`).join(', ');
+                const element = document.getElementById(elementId);
+                if (element) {
+                    element.textContent = freqText;
+                }
+            } catch (error) {
+                console.error('Failed to update frequency display:', error);
+            }
+        }
+
+        console.log('🎵 Tone Analysis Test Ready');
+    </script>
+</body>
+</html>
